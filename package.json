@@ -3,7 +3,9 @@
   "version": "0.0.0",
   "private": true,
   "workspaces": [
-    "strands-ts"
+    "strands-ts",
+    "harness-ts",
+    "strands-cli"
   ],
   "devDependencies": {
     "husky": "^9.1.7",

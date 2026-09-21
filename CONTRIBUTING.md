@@ -52,13 +52,16 @@ The `team/` folder holds the rest of our shared context: the full [tenets](./tea
 
 ## Development Environment
 
-This is a monorepo containing the Python SDK, TypeScript SDK, MCP server, and documentation site. Each has its own toolchain:
+This is a monorepo containing the Python and TypeScript SDKs, the MCP server, the Strands harness (Python, TypeScript, and CLI), and the documentation site. Each has its own toolchain:
 
 | Area | Directory | Toolchain |
 |------|-----------|-----------|
 | Python SDK | `strands-py/` | hatch |
 | TypeScript SDK | `strands-ts/` | npm workspace |
 | MCP server | `strands-mcp/` | hatch |
+| Python harness | `harness-py/` | hatch |
+| TypeScript harness | `harness-ts/` | npm workspace |
+| Harness CLI | `strands-cli/` | npm workspace |
 | Docs site | `site/` | Astro (npm) |
 
 ### Python SDK

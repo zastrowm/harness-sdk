@@ -12,6 +12,9 @@ This file is shared by agents with different goals — writing code, opening PRs
 strands-agents/
 ├── strands-py/         # Python SDK (hatch) — see strands-py/AGENTS.md
 ├── strands-ts/         # TypeScript SDK (npm workspace) — see strands-ts/AGENTS.md
+├── harness-py/         # Python harness (hatch), see harness-py/AGENTS.md
+├── harness-ts/         # TypeScript harness (npm workspace), see harness-ts/AGENTS.md
+├── strands-cli/        # Strands CLI (npm workspace), see strands-cli/AGENTS.md
 ├── site/               # Documentation site (Astro) — see site/AGENTS.md
 ├── team/               # Governance + cross-SDK process (tenets, decisions, API bar-raising, PR & compatibility guidelines, designs/ proposals)
 ├── test-infra/         # CDK stack for integ tests that require provisioned AWS infra
