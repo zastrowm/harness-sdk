@@ -17,7 +17,7 @@ jobs:
     name: npm audit
     permissions:
       contents: read
-    runs-on: strands-agents_ubuntu-latest_4-core
+    runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: strands-cli
