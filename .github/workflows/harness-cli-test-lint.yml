@@ -19,7 +19,7 @@ on:
 jobs:
   test-lint:
     name: Test and Lint
-    runs-on: strands-agents_ubuntu-latest_4-core
+    runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
       contents: read
