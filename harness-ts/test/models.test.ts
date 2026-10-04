@@ -1,5 +1,7 @@
+import { createServer } from 'node:http'
+import type { AddressInfo } from 'node:net'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { Model, ModelRouter } from '@strands-agents/sdk'
+import { Message, Model, ModelRouter, TextBlock } from '@strands-agents/sdk'
 import { BedrockModel } from '@strands-agents/sdk/models/bedrock'
 
 import {
@@ -830,5 +832,49 @@ describe('web_fetch summarizer on a repointed endpoint', () => {
     process.env.ANTHROPIC_BASE_URL = 'https://example.invalid/anthropic'
     const model = await resolveWebFetchModel('bedrock/global.anthropic.claude-opus-4-8', undefined)
     expect(model.getConfig().modelId).toBe('global.anthropic.claude-haiku-4-5-20251001-v1:0')
+  })
+})
+
+describe('bedrock proxy', () => {
+  function handlerProtocol(model: Model): string {
+    const client = (
+      model as unknown as { _client: { config: { requestHandler: { metadata: { handlerProtocol: string } } } } }
+    )._client
+    return client.config.requestHandler.metadata.handlerProtocol
+  }
+
+  it('keeps the default HTTP/2 handler when no proxy is set', async () => {
+    vi.stubEnv('HTTPS_PROXY', undefined)
+    vi.stubEnv('https_proxy', undefined)
+    expect(handlerProtocol(await resolve(DEFAULT))).toBe('h2')
+  })
+
+  it('tunnels Bedrock requests through HTTPS_PROXY', async () => {
+    const targets: string[] = []
+    const proxy = createServer()
+    proxy.on('connect', (request, socket) => {
+      targets.push(request.url ?? '')
+      socket.end('HTTP/1.1 403 Forbidden\r\n\r\n')
+    })
+    await new Promise<void>((resolveListen) => proxy.listen(0, '127.0.0.1', resolveListen))
+    const { port } = proxy.address() as AddressInfo
+    vi.stubEnv('HTTPS_PROXY', `http://127.0.0.1:${port}`)
+    vi.stubEnv('NO_PROXY', undefined)
+    vi.stubEnv('no_proxy', undefined)
+    vi.stubEnv('AWS_REGION', 'us-east-1')
+    vi.stubEnv('AWS_ACCESS_KEY_ID', 'test')
+    vi.stubEnv('AWS_SECRET_ACCESS_KEY', 'test')
+    vi.stubEnv('AWS_SESSION_TOKEN', undefined)
+    vi.stubEnv('AWS_MAX_ATTEMPTS', '1')
+
+    try {
+      const model = await resolve(DEFAULT)
+      expect(handlerProtocol(model)).toBe('http/1.1')
+      const events = model.stream([new Message({ role: 'user', content: [new TextBlock('hi')] })])
+      await expect(Array.fromAsync(events)).rejects.toThrow()
+    } finally {
+      proxy.close()
+    }
+    expect(targets).toEqual(['bedrock-runtime.us-east-1.amazonaws.com:443'])
   })
 })

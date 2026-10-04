@@ -17,12 +17,16 @@
  * needs none. This makes resolution async.
  */
 
+import type { NodeHttpHandler } from '@smithy/node-http-handler'
 import { Model, ModelRouter, type JSONValue } from '@strands-agents/sdk'
 import { DEFAULT_MODEL } from './defaults.js'
 import { warnOnce } from './logging.js'
 import type { Effort } from './types/agent.js'
 
 const ANTHROPIC_MAX_TOKENS = 32_000
+
+// Matches the SDK's BedrockModel default, which a caller-built handler instance does not inherit.
+const BEDROCK_REQUEST_TIMEOUT_MS = 120_000
 
 // Claude's real max_tokens ceiling by tier, verified live against Bedrock Converse. Applied on
 // Bedrock and Anthropic-direct only — other Bedrock-hosted model families aren't known to need
@@ -202,12 +206,34 @@ async function bedrock(modelId: string, effort: string | null, _webSearch: boole
   const thinking = bedrockThinking(modelId, effort)
   const maxTokens = claudeMaxTokens(modelId)
   const region = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION
+  const requestHandler = await bedrockProxyRequestHandler()
   return new BedrockModel({
     modelId,
     ...(region ? { region } : {}),
+    ...(requestHandler ? { clientConfig: { requestHandler } } : {}),
     ...(maxTokens !== undefined ? { maxTokens } : {}),
     ...(cacheConfig ? { cacheConfig } : {}),
     ...(thinking ? { additionalRequestFields: thinking } : {}),
+  })
+}
+
+/**
+ * An HTTP/1.1 handler that honors `HTTPS_PROXY` and `NO_PROXY`, or undefined when no proxy is set.
+ *
+ * The Bedrock client defaults to an HTTP/2 handler, which connects directly and cannot tunnel
+ * through a CONNECT proxy. `proxyEnv` needs Node 22.21 or 24.5; older Node connects directly.
+ */
+async function bedrockProxyRequestHandler(): Promise<NodeHttpHandler | undefined> {
+  if (!(process.env.HTTPS_PROXY || process.env.https_proxy)) {
+    return undefined
+  }
+  const [{ NodeHttpHandler }, { Agent }] = await Promise.all([
+    import('@smithy/node-http-handler'),
+    import('node:https'),
+  ])
+  return new NodeHttpHandler({
+    httpsAgent: new Agent({ keepAlive: true, proxyEnv: process.env }),
+    requestTimeout: BEDROCK_REQUEST_TIMEOUT_MS,
   })
 }
 
