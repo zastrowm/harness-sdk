@@ -1,0 +1,39 @@
+Defined in: [src/mcp/task-types.ts:123](https://github.com/strands-agents/harness-sdk/blob/main/strands-ts/src/mcp/task-types.ts#L123)
+
+Empty acknowledgement returned by `tasks/cancel`.
+
+## Extends
+
+-   [`McpTaskResult`](/harness-sdk/pr-cms-46/docs/api/typescript/McpTaskResult/index.md)
+
+## Properties
+
+### \_meta?
+
+```ts
+_meta?: Record<string, unknown>;
+```
+
+Defined in: [src/mcp/task-types.ts:100](https://github.com/strands-agents/harness-sdk/blob/main/strands-ts/src/mcp/task-types.ts#L100)
+
+Optional MCP result metadata.
+
+#### Inherited from
+
+[`McpTaskResult`](/harness-sdk/pr-cms-46/docs/api/typescript/McpTaskResult/index.md).[`_meta`](/harness-sdk/pr-cms-46/docs/api/typescript/McpTaskResult/index.md#_meta)
+
+---
+
+### resultType
+
+```ts
+resultType: "complete";
+```
+
+Defined in: [src/mcp/task-types.ts:124](https://github.com/strands-agents/harness-sdk/blob/main/strands-ts/src/mcp/task-types.ts#L124)
+
+Wire discriminator for task handles and completed task operations.
+
+#### Overrides
+
+[`McpTaskResult`](/harness-sdk/pr-cms-46/docs/api/typescript/McpTaskResult/index.md).[`resultType`](/harness-sdk/pr-cms-46/docs/api/typescript/McpTaskResult/index.md#resulttype)

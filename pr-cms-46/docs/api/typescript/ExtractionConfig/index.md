@@ -1,0 +1,45 @@
+Defined in: [src/memory/extraction/types.ts:134](https://github.com/strands-agents/harness-sdk/blob/main/strands-ts/src/memory/extraction/types.ts#L134)
+
+Per-store automatic-extraction configuration.
+
+Lives on a store (via [MemoryStoreConfig](/harness-sdk/pr-cms-46/docs/api/typescript/MemoryStoreConfig/index.md)) so different stores can extract on different schedules and in different styles. [trigger](#trigger) decides *when*; [extractor](#extractor) decides *how* (omit it to pass raw messages straight to the store); [filter](#filter) prunes content blocks first.
+
+## Properties
+
+### trigger?
+
+```ts
+trigger?:
+  | ExtractionTrigger
+  | ExtractionTrigger[];
+```
+
+Defined in: [src/memory/extraction/types.ts:140](https://github.com/strands-agents/harness-sdk/blob/main/strands-ts/src/memory/extraction/types.ts#L140)
+
+When to run extraction. A single trigger or an array; multiple triggers compose (extraction runs whenever any of them fires). Omit to default to every 5 turns; an explicit empty array is rejected at construction.
+
+---
+
+### extractor?
+
+```ts
+extractor?: Extractor;
+```
+
+Defined in: [src/memory/extraction/types.ts:148](https://github.com/strands-agents/harness-sdk/blob/main/strands-ts/src/memory/extraction/types.ts#L148)
+
+How to turn messages into entries (client-side extraction). When set, the store must implement `add` and each produced entry is stored through it. When omitted, the default depends on the store’s write methods: a store implementing `addMessages` uses server-side extraction (the manager hands it the raw messages, no model call), while a store implementing only `add` defaults to a [ModelExtractor](/harness-sdk/pr-cms-46/docs/api/typescript/ModelExtractor/index.md) that distills facts client-side.
+
+---
+
+### filter?
+
+```ts
+filter?: MemoryMessageFilter;
+```
+
+Defined in: [src/memory/extraction/types.ts:156](https://github.com/strands-agents/harness-sdk/blob/main/strands-ts/src/memory/extraction/types.ts#L156)
+
+Content blocks to strip before extraction. Defaults to DEFAULT\_MEMORY\_MESSAGE\_FILTER (excludes `toolUse` / `toolResult`).
+
+For use cases or extractors with value in distilling over the *full* turn you instead want everything: pass `{ exclude: [] }` so tool blocks reach `addMessages`.

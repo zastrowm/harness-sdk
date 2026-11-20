@@ -1,0 +1,29 @@
+# Strands Agents
+
+> Strands Agents is the open source toolkit for building production AI agents in Python and TypeScript. It runs in your process with no hosted Strands control plane.
+
+## Start here
+
+- [Documentation](http://github.programdotrun.com/harness-sdk/pr-cms-46/docs/user-guide/sdk/quickstart/overview/index.md): Choose a model provider and build your first agent.
+- [Harness quickstart](http://github.programdotrun.com/harness-sdk/pr-cms-46/docs/user-guide/harness/quickstart/index.md): Start with a fully assembled agent.
+- [Build with AI coding agents](http://github.programdotrun.com/harness-sdk/pr-cms-46/docs/user-guide/build-with-ai/index.md): Install the Strands plugin for Claude Code, Codex, or Cursor.
+- [Examples](http://github.programdotrun.com/harness-sdk/pr-cms-46/examples/): Explore complete agent examples.
+- [Frequently asked questions](http://github.programdotrun.com/harness-sdk/pr-cms-46/faq/index.md): Get practical answers about choosing, building, evaluating, and deploying with Strands.
+
+## Official packages
+
+- [Python harness](https://pypi.org/project/strands-harness/)
+- [TypeScript harness](https://www.npmjs.com/package/@strands-agents/harness)
+- [Python SDK](https://pypi.org/project/strands-agents/)
+- [TypeScript SDK](https://www.npmjs.com/package/@strands-agents/sdk)
+- [Strands CLI](https://www.npmjs.com/package/@strands-agents/cli)
+- [MCP server](https://pypi.org/project/strands-agents-mcp-server/)
+
+## Source and machine-readable docs
+
+- [GitHub repository](https://github.com/strands-agents/harness-sdk)
+- [Samples](https://github.com/strands-agents/samples)
+- [OpenAPI description](http://github.programdotrun.com/harness-sdk/pr-cms-46/openapi.json)
+- [Integrations catalog](http://github.programdotrun.com/harness-sdk/pr-cms-46/integrations.json)
+- [Documentation index for language models](http://github.programdotrun.com/harness-sdk/pr-cms-46/llms.txt)
+- [Complete documentation corpus](http://github.programdotrun.com/harness-sdk/pr-cms-46/llms-full.txt)

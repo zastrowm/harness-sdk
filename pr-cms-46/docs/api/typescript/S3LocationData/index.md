@@ -1,0 +1,47 @@
+Defined in: [src/types/media.ts:81](https://github.com/strands-agents/harness-sdk/blob/main/strands-ts/src/types/media.ts#L81)
+
+Data for an S3 location.
+
+## Extends
+
+-   [`LocationData`](/harness-sdk/pr-cms-46/docs/api/typescript/LocationData/index.md)
+
+## Properties
+
+### type
+
+```ts
+type: "s3";
+```
+
+Defined in: [src/types/media.ts:85](https://github.com/strands-agents/harness-sdk/blob/main/strands-ts/src/types/media.ts#L85)
+
+Location type — always “s3”.
+
+#### Overrides
+
+[`LocationData`](/harness-sdk/pr-cms-46/docs/api/typescript/LocationData/index.md).[`type`](/harness-sdk/pr-cms-46/docs/api/typescript/LocationData/index.md#type)
+
+---
+
+### uri
+
+```ts
+uri: string;
+```
+
+Defined in: [src/types/media.ts:90](https://github.com/strands-agents/harness-sdk/blob/main/strands-ts/src/types/media.ts#L90)
+
+S3 URI in format: s3://bucket-name/key-name
+
+---
+
+### bucketOwner?
+
+```ts
+bucketOwner?: string;
+```
+
+Defined in: [src/types/media.ts:96](https://github.com/strands-agents/harness-sdk/blob/main/strands-ts/src/types/media.ts#L96)
+
+AWS account ID of the S3 bucket owner (12-digit). Required if the bucket belongs to another AWS account.
