@@ -1,0 +1,75 @@
+Defined in: [src/models/streaming.ts:204](https://github.com/strands-agents/harness-sdk/blob/main/strands-ts/src/models/streaming.ts#L204)
+
+Event emitted when the message completes.
+
+## Implements
+
+-   [`ModelMessageStopEventData`](/harness-sdk/pr-cms-45/docs/api/typescript/ModelMessageStopEventData/index.md)
+
+## Constructors
+
+### Constructor
+
+```ts
+new ModelMessageStopEvent(data): ModelMessageStopEvent;
+```
+
+Defined in: [src/models/streaming.ts:220](https://github.com/strands-agents/harness-sdk/blob/main/strands-ts/src/models/streaming.ts#L220)
+
+#### Parameters
+
+| Parameter | Type |
+| --- | --- |
+| `data` | [`ModelMessageStopEventData`](/harness-sdk/pr-cms-45/docs/api/typescript/ModelMessageStopEventData/index.md) |
+
+#### Returns
+
+`ModelMessageStopEvent`
+
+## Properties
+
+### type
+
+```ts
+readonly type: "modelMessageStopEvent";
+```
+
+Defined in: [src/models/streaming.ts:208](https://github.com/strands-agents/harness-sdk/blob/main/strands-ts/src/models/streaming.ts#L208)
+
+Discriminator for message stop events.
+
+#### Implementation of
+
+[`ModelMessageStopEventData`](/harness-sdk/pr-cms-45/docs/api/typescript/ModelMessageStopEventData/index.md).[`type`](/harness-sdk/pr-cms-45/docs/api/typescript/ModelMessageStopEventData/index.md#type)
+
+---
+
+### stopReason
+
+```ts
+readonly stopReason: StopReason;
+```
+
+Defined in: [src/models/streaming.ts:213](https://github.com/strands-agents/harness-sdk/blob/main/strands-ts/src/models/streaming.ts#L213)
+
+Reason why generation stopped.
+
+#### Implementation of
+
+[`ModelMessageStopEventData`](/harness-sdk/pr-cms-45/docs/api/typescript/ModelMessageStopEventData/index.md).[`stopReason`](/harness-sdk/pr-cms-45/docs/api/typescript/ModelMessageStopEventData/index.md#stopreason)
+
+---
+
+### additionalModelResponseFields?
+
+```ts
+readonly additionalModelResponseFields?: JSONValue;
+```
+
+Defined in: [src/models/streaming.ts:218](https://github.com/strands-agents/harness-sdk/blob/main/strands-ts/src/models/streaming.ts#L218)
+
+Additional provider-specific response fields.
+
+#### Implementation of
+
+[`ModelMessageStopEventData`](/harness-sdk/pr-cms-45/docs/api/typescript/ModelMessageStopEventData/index.md).[`additionalModelResponseFields`](/harness-sdk/pr-cms-45/docs/api/typescript/ModelMessageStopEventData/index.md#additionalmodelresponsefields)

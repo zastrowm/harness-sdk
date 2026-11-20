@@ -1,0 +1,533 @@
+[Anthropic](https://docs.anthropic.com/en/home) is an AI safety and research company and the maker of the Claude family of models. The Strands Agents SDK implements an Anthropic provider, letting you run agents against Claude models directly.
+
+## Installation
+
+Anthropic is configured as an optional dependency in Strands Agents. To install, run:
+
+(( tab "Python" ))
+```bash
+pip install 'strands-agents[anthropic]'
+```
+(( /tab "Python" ))
+
+(( tab "TypeScript" ))
+```bash
+npm install @strands-agents/sdk @anthropic-ai/sdk
+```
+(( /tab "TypeScript" ))
+
+## Usage
+
+After installing dependencies, you can import and initialize the Strands Agents’ Anthropic provider as follows:
+
+(( tab "Python" ))
+```python
+from strands import Agent
+from strands.models.anthropic import AnthropicModel
+from strands.vended_tools import notebook
+
+model = AnthropicModel(
+    client_args={
+        "api_key": "<KEY>",
+    },
+    # **model_config
+    max_tokens=1028,
+    model_id="claude-sonnet-5",
+)
+
+agent = Agent(model=model, tools=[notebook])
+response = agent('Create a notebook named "ideas" and add three project ideas.')
+print(response)
+```
+(( /tab "Python" ))
+
+(( tab "TypeScript" ))
+```typescript
+import { Agent } from '@strands-agents/sdk'
+import { AnthropicModel } from '@strands-agents/sdk/models/anthropic'
+
+const model = new AnthropicModel({
+  apiKey: process.env.ANTHROPIC_API_KEY || '<KEY>',
+  modelId: 'claude-sonnet-5',
+  maxTokens: 1028,
+  params: {
+    metadata: { user_id: 'u1' },
+  },
+})
+
+const agent = new Agent({ model })
+const response = await agent.invoke('What is 2+2')
+console.log(response)
+```
+(( /tab "TypeScript" ))
+
+## Configuration
+
+### Client Configuration
+
+(( tab "Python" ))
+The `client_args` configure the underlying Anthropic client. For a complete list of available arguments, please refer to the [Anthropic Python SDK docs](https://platform.claude.com/docs/en/api/sdks/python).
+(( /tab "Python" ))
+
+(( tab "TypeScript" ))
+The `clientConfig` configures the underlying Anthropic client. You can also pass a pre-configured `client` instance directly (see [Custom Client](#custom-client)). For a complete list of available options, please refer to the [Anthropic TypeScript SDK docs](https://platform.claude.com/docs/en/api/sdks/typescript).
+(( /tab "TypeScript" ))
+
+### Model Configuration
+
+(( tab "Python" ))
+The `model_config` configures the underlying model selected for inference. The supported configurations are:
+
+| Parameter | Description | Example | Options |
+| --- | --- | --- | --- |
+| `max_tokens` | Maximum number of tokens to generate. Defaults to the model’s output limit from the model info; required when that limit is unknown | `1028` | [reference](https://platform.claude.com/docs/en/api/messages/create#create.max_tokens) |
+| `model_id` | ID of a model to use | `claude-sonnet-5` | [reference](https://platform.claude.com/docs/en/api/messages/create#create.model) |
+| `params` | Additional pass-through parameters | `{"metadata": {"user_id": "u1"}}` | [reference](https://platform.claude.com/docs/en/api/messages/create) |
+| `anthropic_tools` | [Built-in tools](#built-in-tools), appended to the agent’s function tools | `[{"type": "web_search_20260318", "name": "web_search"}]` | [reference](https://platform.claude.com/docs/en/docs/agents-and-tools/tool-use/overview) |
+| `cache_config` | Enables [prompt caching](#prompt-caching) on the system prompt and the conversation | `CacheConfig(ttl="1h")` | [reference](https://docs.claude.com/en/docs/build-with-claude/prompt-caching) |
+| `cache_tools` | Caches the tool definitions (deprecated, use `cache_config` with `tools_ttl`) | `"default"` or `CacheToolsConfig(ttl="1h")` | [reference](https://docs.claude.com/en/docs/build-with-claude/prompt-caching) |
+(( /tab "Python" ))
+
+(( tab "TypeScript" ))
+| Parameter | Description | Example | Options |
+| --- | --- | --- | --- |
+| `modelId` | ID of a model to use | `'claude-sonnet-5'` | [reference](https://platform.claude.com/docs/en/api/messages/create#create.model) |
+| `maxTokens` | Maximum tokens to generate | `1028` | [reference](https://platform.claude.com/docs/en/api/messages/create#create.max_tokens) |
+| `stopSequences` | Sequences that stop generation | `['END']` | [reference](https://platform.claude.com/docs/en/api/messages/create#create.stop_sequences) |
+| `params` | Additional pass-through parameters | `{ metadata: { user_id: 'u1' } }` | [reference](https://platform.claude.com/docs/en/api/messages/create) |
+| `anthropicTools` | [Built-in tools](#built-in-tools), appended to the agent’s function tools | `[{ type: 'web_search_20260318', name: 'web_search' }]` | [reference](https://platform.claude.com/docs/en/docs/agents-and-tools/tool-use/overview) |
+| `cacheConfig` | Enables [prompt caching](#prompt-caching) on the tool definitions, the system prompt, and the conversation | `{ ttl: '1h' }` | [reference](https://docs.claude.com/en/docs/build-with-claude/prompt-caching) |
+(( /tab "TypeScript" ))
+
+## Troubleshooting
+
+(( tab "Python" ))
+### Module Not Found
+
+If you encounter the error `ModuleNotFoundError: No module named 'anthropic'`, this means you haven’t installed the `anthropic` dependency in your environment. To fix, run `pip install 'strands-agents[anthropic]'`.
+(( /tab "Python" ))
+
+(( tab "TypeScript" ))
+### Import Errors
+
+If you encounter import errors for `@anthropic-ai/sdk`, ensure the package is installed: `npm install @anthropic-ai/sdk`.
+(( /tab "TypeScript" ))
+
+### Anthropic SDK 1.x and 2.x
+
+(( tab "Python" ))
+`strands-agents[anthropic]` installs any `anthropic` release from 0.21 up to, but not including, 3.0. The 1.0 and 2.0 releases changed behavior that reaches `AnthropicModel`:
+
+-   **Sampling parameters.** `temperature`, `top_p`, and `top_k` in `params` are sent in the request body, so they keep working on every SDK version. API version `2026-10-21`, the default on `anthropic` 2.x, rejects them, and the provider raises a `ValueError` before sending the request. Remove them, or pin the API version with `client_args={"default_headers": {"anthropic-version": "2023-06-01"}}`. On a client passed as `client=`, set the same `default_headers`. For Claude on Amazon Bedrock InvokeModel, see [Claude through the Anthropic Messages API](/harness-sdk/pr-cms-45/docs/user-guide/sdk/model-providers/amazon-bedrock/index.md#claude-through-the-anthropic-messages-api). The pin only helps on models that still honor sampling parameters (Claude 4.6 and earlier); Claude 4.7 and later accept only the defaults.
+-   **Documents in assistant messages.** API version `2026-10-21` rejects a `document` block placed directly in an assistant message, so the provider drops those blocks and logs a warning. Put documents in user messages; a document nested inside a tool result is unaffected.
+-   **`http_client`.** From 1.0 the SDK is built on `httpx2`, so a custom `http_client` passed through `client_args` must be an `httpx2.AsyncClient`, not an `httpx.AsyncClient`.
+-   **Authentication.** From 2.0 the API key is sent as `Authorization: Bearer`, which matters behind a proxy that reads `X-Api-Key`. A client also holds one credential, so pass either `api_key` or `auth_token` in `client_args`, not both.
+(( /tab "Python" ))
+
+(( tab "TypeScript" ))
+`@strands-agents/sdk` works with any `@anthropic-ai/sdk` release from 0.109.1 up to, but not including, 2.0. In TypeScript the new API version arrives with the SDK’s 1.0 release (in Python it’s 2.0): `@anthropic-ai/sdk` 1.x sends `2026-10-21` by default ([migration guide](https://platform.claude.com/docs/en/api/migration-2026-10-21)), which changes behavior that reaches `AnthropicModel`:
+
+-   **Sampling parameters.** API version `2026-10-21` rejects `temperature`, `top_p`, and `top_k`, so when one is set (`temperature`, `topP`, or in `params`) the provider throws before sending the request. Remove them, or pin the API version with `clientConfig: { defaultHeaders: { 'anthropic-version': '2023-06-01' } }` or `ANTHROPIC_CUSTOM_HEADERS='anthropic-version: 2023-06-01'`. The pin only helps on models that still honor sampling parameters (Claude 4.6 and earlier); Claude 4.7 and later accept only the defaults.
+-   **Documents in assistant messages.** API version `2026-10-21` rejects a `document` block placed directly in an assistant message, so the provider drops those blocks and logs a warning. Put documents in user messages.
+-   **Injected clients.** With a `client` you pass in, the provider doesn’t know which API version it sends, so neither check above runs and the API’s own error surfaces instead.
+-   **Authentication.** From 1.0 the API key is sent as `Authorization: Bearer`, which matters behind a proxy that reads `X-Api-Key`. A client also holds one credential, so pass either `apiKey` or `authToken` in `clientConfig`, not both.
+(( /tab "TypeScript" ))
+
+### Thinking block is bound to a different conversation
+
+When the Anthropic API rejects a request with this 400 error:
+
+> The block is bound to a different conversation.
+
+The provider retries the request once and logs this warning:
+
+```plaintext
+model_id=<...> | history edit invalidated replayed thinking blocks, retrying with drop_block
+```
+
+Claude models that preserve thinking bind each thinking block to the conversation that came before it. Summarizing or removing messages with [context management](/harness-sdk/pr-cms-45/docs/user-guide/sdk/context-management/index.md) or a conversation manager, restoring a session, or editing messages from a hook changes that earlier conversation, so the thinking blocks that remain in the history no longer match it. Accounts that enforce this binding, the default for accounts created on or after August 31, 2026, reject the next request.
+
+The retry sets `prefix_mismatch_behavior` to `drop_block` in the `thinking.block_binding` request field, with `"type": "adaptive"` when no thinking is configured, and adds the `thinking-binding-controls-2026-08-01` beta to the `anthropic-beta` header. Claude then skips the stale thinking blocks instead of rejecting the request. The stale blocks stay in the history, so the provider keeps sending `drop_block` for that model ID until the model instance is discarded. Requests before the first rejection are sent unchanged.
+
+-   **Your `block_binding` wins.** If the thinking configuration already contains `block_binding`, the provider sends it as written and does not retry. Set it yourself to choose the behavior up front or to keep the error.
+-   **Existing betas are kept.** The beta is added to the betas the model already sends, from `extra_headers``betas` or, when that is not set, from the `anthropic-beta` default header of the client. A pre-configured client does not expose its default headers, so set its betas with `extra_headers``betas`.
+-   **Dropping has a cost.** Claude loses the reasoning in the dropped blocks, the prompt cache restarts at the edited message, and responses can use more output tokens.
+-   **Some models require adaptive thinking.** Claude Sonnet 5.5 and Claude Haiku 5.5 accept `drop_block` only with `"type": "adaptive"`. With any other thinking type, the retry fails and its error is raised.
+
+A message-level summary from [context management](/harness-sdk/pr-cms-45/docs/user-guide/sdk/context-management/index.md) avoids this error when it runs server-side. See [Server-side summarization](#server-side-summarization) for when it does.
+
+## Advanced Features
+
+### Custom Client
+
+You can pass a pre-configured Anthropic client directly to `AnthropicModel`. You are responsible for managing the client’s lifecycle.
+
+(( tab "Python" ))
+Use this for clients `client_args` can’t build, such as Claude on Amazon Bedrock:
+
+```python
+import anthropic
+from strands import Agent
+from strands.models.anthropic import AnthropicModel
+
+model = AnthropicModel(
+    model_id="global.anthropic.claude-sonnet-4-6",
+    max_tokens=4096,
+    client=anthropic.AsyncAnthropicBedrock(aws_region="us-west-2"),
+)
+
+agent = Agent(model=model)
+response = agent("What is 2+2?")
+print(response)
+```
+
+For the `bedrock-mantle` client and the differences from the Anthropic API, see [Claude through the Anthropic Messages API](/harness-sdk/pr-cms-45/docs/user-guide/sdk/model-providers/amazon-bedrock/index.md#claude-through-the-anthropic-messages-api) on the Amazon Bedrock page.
+(( /tab "Python" ))
+
+(( tab "TypeScript" ))
+```typescript
+import Anthropic from '@anthropic-ai/sdk'
+import { Agent } from '@strands-agents/sdk'
+import { AnthropicModel } from '@strands-agents/sdk/models/anthropic'
+
+const client = new Anthropic({ apiKey: '<KEY>' })
+
+const model = new AnthropicModel({
+  client,
+  modelId: 'claude-sonnet-5',
+  maxTokens: 1028,
+})
+
+const agent = new Agent({ model })
+const response = await agent.invoke('What is 2+2')
+console.log(response)
+```
+(( /tab "TypeScript" ))
+
+### Structured Output
+
+Anthropic models support structured output through tool use. Pass a schema to the agent, and Strands generates a tool from it that the model calls to return validated, type-safe data.
+
+(( tab "Python" ))
+Define a Pydantic model and pass it to [`agent.structured_output()`](/harness-sdk/pr-cms-45/docs/api/python/strands.agent.agent#Agent.structured_output):
+
+```python
+from pydantic import BaseModel, Field
+from strands import Agent
+from strands.models.anthropic import AnthropicModel
+
+class MovieReview(BaseModel):
+    """Analyze a movie review."""
+    title: str = Field(description="Movie title")
+    rating: int = Field(description="Rating from 1-10", ge=1, le=10)
+    genre: str = Field(description="Primary genre")
+    sentiment: str = Field(description="Overall sentiment: positive, negative, or neutral")
+    summary: str = Field(description="Brief summary of the review")
+
+model = AnthropicModel(
+    client_args={"api_key": "<KEY>"},
+    max_tokens=1028,
+    model_id="claude-sonnet-5",
+)
+
+agent = Agent(model=model)
+
+result = agent.structured_output(
+    MovieReview,
+    """
+    Just watched "The Matrix" - what an incredible sci-fi masterpiece!
+    The groundbreaking visual effects and philosophical themes make this
+    a must-watch. Keanu Reeves delivers a solid performance. 9/10!
+    """
+)
+
+print(f"Movie: {result.title}")
+print(f"Rating: {result.rating}/10")
+print(f"Genre: {result.genre}")
+print(f"Sentiment: {result.sentiment}")
+```
+(( /tab "Python" ))
+
+(( tab "TypeScript" ))
+Define a Zod schema and pass it as `structuredOutputSchema`. Validated output is on `result.structuredOutput`:
+
+```typescript
+import { Agent } from '@strands-agents/sdk'
+import { AnthropicModel } from '@strands-agents/sdk/models/anthropic'
+import { z } from 'zod'
+
+const MovieReview = z.object({
+  title: z.string().describe('Movie title'),
+  rating: z.number().min(1).max(10).describe('Rating from 1-10'),
+  genre: z.string().describe('Primary genre'),
+  sentiment: z.enum(['positive', 'negative', 'neutral']).describe('Overall sentiment'),
+  summary: z.string().describe('Brief summary of the review'),
+})
+
+const model = new AnthropicModel({
+  apiKey: '<KEY>',
+  modelId: 'claude-sonnet-5',
+  maxTokens: 1028,
+})
+
+const agent = new Agent({ model, structuredOutputSchema: MovieReview })
+
+const result = await agent.invoke(
+  `Just watched "The Matrix" - what an incredible sci-fi masterpiece!
+   The groundbreaking visual effects and philosophical themes make this
+   a must-watch. Keanu Reeves delivers a solid performance. 9/10!`
+)
+
+const review = result.structuredOutput as z.infer<typeof MovieReview>
+console.log(`Movie: ${review.title}`)
+console.log(`Rating: ${review.rating}/10`)
+console.log(`Genre: ${review.genre}`)
+console.log(`Sentiment: ${review.sentiment}`)
+```
+(( /tab "TypeScript" ))
+
+For schema patterns, error handling, and per-invocation overrides, see [Structured Output](/harness-sdk/pr-cms-45/docs/user-guide/sdk/agents/structured-output/index.md).
+
+### Built-in Tools
+
+(( tab "Python" ))
+Anthropic’s built-in server-side tools (web search, web fetch, code execution) can be passed via the `anthropic_tools` config option. These are appended alongside any function tools registered on the agent.
+
+```python
+from strands import Agent
+from strands.models.anthropic import AnthropicModel
+
+model = AnthropicModel(
+    client_args={"api_key": "<KEY>"},
+    model_id="claude-sonnet-4-6",
+    max_tokens=1028,
+    anthropic_tools=[{"type": "web_search_20260318", "name": "web_search", "max_uses": 5}],
+)
+
+agent = Agent(model=model)
+response = agent("What are the latest AI news today?")
+print(response)
+```
+(( /tab "Python" ))
+
+(( tab "TypeScript" ))
+Anthropic’s built-in server-side tools (web search, web fetch, code execution) can be passed via the `anthropicTools` config option. These are appended alongside any function tools registered on the agent.
+
+```typescript
+import { Agent } from '@strands-agents/sdk'
+import { AnthropicModel } from '@strands-agents/sdk/models/anthropic'
+
+const model = new AnthropicModel({
+  apiKey: '<KEY>',
+  modelId: 'claude-sonnet-4-6',
+  maxTokens: 1028,
+  anthropicTools: [{ type: 'web_search_20260318', name: 'web_search', max_uses: 5 }],
+})
+
+const agent = new Agent({ model })
+const response = await agent.invoke('What are the latest AI news today?')
+console.log(response)
+```
+(( /tab "TypeScript" ))
+
+Web search results are surfaced as citations on the response text when Claude calls the tool directly (`allowed_callers: ["direct"]`). On `web_search_20260318` the default is dynamic filtering, which runs the search inside code execution and returns no citations. For available built-in tools and their versioned `type` strings, see the [Anthropic tool use documentation](https://platform.claude.com/docs/en/docs/agents-and-tools/tool-use/overview).
+
+Limitations:
+
+-   The raw server-tool blocks (search results, fetched pages, code output) are not kept in the conversation history, so on a later turn the model cannot refer back to them and will call the tool again if it needs them.
+-   When Anthropic pauses a long-running server-tool turn, the model provider resumes it automatically, up to 10 times per request, before the response reaches the agent loop. If the turn is still paused after that, the provider raises an error.
+-   Server tools are not sent when a specific tool call is forced (`tool_choice` of `any` or `tool`), which includes the forced structured-output retry; the model can only use them on turns where it is free to choose.
+-   Server-tool calls are billed separately by Anthropic and are not included in Strands usage metrics.
+
+### Prompt Caching
+
+[Prompt caching](https://docs.claude.com/en/docs/build-with-claude/prompt-caching) lets Claude reuse an already-processed prefix of your prompt instead of reprocessing it on every call. The mechanism, the cost model, and the cache metrics match [Amazon Bedrock](/harness-sdk/pr-cms-45/docs/user-guide/sdk/model-providers/amazon-bedrock-prompt-caching/index.md); this section covers what differs here.
+
+Caching is off by default. Set `cache_config``cacheConfig` to cache the system prompt and add a cache point to the last user message, which caches everything before it:
+
+(( tab "Python" ))
+```python
+from strands import Agent
+from strands.models.anthropic import AnthropicModel
+from strands.models import CacheConfig
+
+model = AnthropicModel(
+    model_id="claude-sonnet-5",
+    max_tokens=1028,
+    cache_config=CacheConfig(ttl="1h", tools_ttl="1h"),
+)
+
+agent = Agent(model=model)
+result = agent("Summarize the attached report.")
+print(result.metrics.accumulated_usage)
+
+# Typical output:
+# {'inputTokens': 12, ..., 'cacheReadInputTokens': 2505}
+```
+(( /tab "Python" ))
+
+(( tab "TypeScript" ))
+```typescript
+import { Agent } from '@strands-agents/sdk'
+import { AnthropicModel } from '@strands-agents/sdk/models/anthropic'
+
+const model = new AnthropicModel({
+  modelId: 'claude-sonnet-5',
+  maxTokens: 1028,
+  cacheConfig: { ttl: '1h' },
+})
+
+const agent = new Agent({ model })
+const result = await agent.invoke('Summarize the attached report.')
+console.log(result.metrics?.accumulatedUsage)
+
+// Typical output:
+// { inputTokens: 12, ..., cacheReadInputTokens: 2505 }
+```
+(( /tab "TypeScript" ))
+
+Cache activity is reported in the usage metrics, in the same fields Bedrock uses: see [cache metrics](/harness-sdk/pr-cms-45/docs/user-guide/sdk/model-providers/amazon-bedrock-prompt-caching/index.md#cache-metrics).
+
+#### Choosing what to cache
+
+(( tab "Python" ))
+`cache_config` caches the system prompt and the conversation; set `system_prompt_ttl=False` to leave the system prompt uncached, or a TTL string (`system_prompt_ttl="1h"`) to give it its own duration. `messages_ttl` works the same way for the conversation: `False` leaves it uncached, and a TTL string gives it its own duration. Add `tools_ttl` to the same `cache_config` to cache the tool definitions as well: a TTL string sets the duration, `True` uses the provider default. The model-level `cache_tools` parameter (and `CacheToolsConfig`) is deprecated in favor of `tools_ttl`; it still works, and unlike `tools_ttl` it caches the tool definitions on its own, without a `cache_config`. Passing a plain string (`"default"`) to `cache_tools` only switches it on: the value is not a TTL.
+
+`strategy` is ignored by this provider.
+(( /tab "Python" ))
+
+(( tab "TypeScript" ))
+One `cacheConfig` covers the tool definitions, the system prompt, and the conversation, with `toolsTTL`, `systemPromptTTL`, and `messagesTTL` controlling them independently (set one to `false` to leave that part uncached). The shape and the per-field behavior are the same as on [Amazon Bedrock](/harness-sdk/pr-cms-45/docs/user-guide/sdk/model-providers/amazon-bedrock-prompt-caching/index.md#tool-caching), so a configuration survives a provider switch unchanged.
+
+`strategy` is ignored by this provider.
+(( /tab "TypeScript" ))
+
+#### Placing cache points by hand
+
+Placement works as it does on [Amazon Bedrock](/harness-sdk/pr-cms-45/docs/user-guide/sdk/model-providers/amazon-bedrock-prompt-caching/index.md#messages-caching): a cache point you put in the last user message is kept where you put it, automatic placement is suspended for that message, and points in earlier messages are removed. Place your point *ahead* of content that is rebuilt on every call, otherwise it lands inside the cached prefix and every request writes an entry that none ever reads.
+
+Two constraints are specific to this API:
+
+-   **Only some block types accept a cache point.** Text, image, tool use, tool result, and document blocks do; a reasoning block does not. A point with only a reasoning block, or a media block sourced by location, ahead of it cannot be honored, so automatic placement applies instead.
+-   **Maximum of four cache points per request**, shared across the tool definitions, the system prompt, and the messages. Automatic placement uses one per part it caches, so hand-placing several of your own alongside it can exceed the limit, and the API rejects the request.
+
+A prompt below the model’s minimum cacheable length is not cached: if both cache metrics stay at zero, that is the likely cause. See [cache limitations](https://docs.claude.com/en/docs/build-with-claude/prompt-caching#cache-limitations) for per-model thresholds.
+
+### Server-side summarization
+
+The provider supports `server_side_summary``serverSideSummary` for Claude Opus 5.5, Claude Sonnet 5.5, Claude Haiku 5.5, Claude Fable 5.1, Claude Fable 5.2, and Claude Mythos 5.2. For these models, a message-level summary from [context management](/harness-sdk/pr-cms-45/docs/user-guide/sdk/context-management/index.md) goes through Anthropic’s compaction API instead of a client-side summarization request. The summary replaces the start of the conversation with a single compaction block, so the thinking blocks after it stay valid and the error in [Thinking block is bound to a different conversation](#thinking-block-is-bound-to-a-different-conversation) does not occur.
+
+The provider adds the `compact-2026-09-04` beta to the compaction request and to every later request that carries the compaction block. Those requests send the conversation from the last compaction block onward.
+
+To keep thinking blocks, pair an eager per-block strategy for tool results with a message-level summary:
+
+(( tab "Python" ))
+```python
+from strands import Agent
+from strands.experimental.context_manager import Offload
+from strands.models.anthropic import AnthropicModel
+
+model = AnthropicModel(
+    model_id="claude-opus-5-5",
+    max_tokens=16000,
+    params={"thinking": {"type": "adaptive"}},
+)
+
+agent = Agent(
+    model=model,
+    context_manager={
+        "strategies": [
+            Offload.summarize("tool_results").when(threshold=2000),
+            Offload.summarize("*").when(utilization=0.85, preserve_recent=4),
+        ],
+    },
+)
+```
+(( /tab "Python" ))
+
+(( tab "TypeScript" ))
+```typescript
+import { Agent } from '@strands-agents/sdk'
+import { Offload } from '@strands-agents/sdk/context-manager'
+import { AnthropicModel } from '@strands-agents/sdk/models/anthropic'
+
+const model = new AnthropicModel({
+  modelId: 'claude-opus-5-5',
+  maxTokens: 16000,
+  params: { thinking: { type: 'adaptive' } },
+})
+
+const agent = new Agent({
+  model,
+  contextManager: {
+    strategies: [
+      Offload.summarize('toolResults').when({ blockThreshold: 2000 }),
+      Offload.summarize('*').when({ contextUtilization: '85%', preserveRecent: 4 }),
+    ],
+  },
+})
+```
+(( /tab "TypeScript" ))
+
+The summarizing model, the agent’s own model by default, must also support server-side summary. Otherwise the summary runs client-side and drops thinking. A pinned message inside the summarized range also sends the summary client-side. See [Models that preserve thinking](/harness-sdk/pr-cms-45/docs/user-guide/sdk/context-management/custom-strategies/index.md#models-that-preserve-thinking) for which strategies keep thinking.
+
+### Token Counting
+
+Token counting is used by context management strategies to estimate input tokens before each model call.
+
+(( tab "Python" ))
+The Anthropic provider can use the native `messages.count_tokens()` API, which provides exact token counts including system prompts, messages, and tool specifications.
+
+You can enable native token counting with:
+
+```python
+model = AnthropicModel(
+    model_id="claude-sonnet-5",
+    use_native_token_count=True,
+)
+```
+
+When disabled (or if the API call fails), falls back to estimation with a character-based heuristic (characters ÷ 4 for text, characters ÷ 2 for JSON).
+(( /tab "Python" ))
+
+(( tab "TypeScript" ))
+The Anthropic provider can use the native `messages.countTokens()` API, which provides exact token counts including system prompts, messages, and tool specifications.
+
+You can enable native token counting with:
+
+```typescript
+const model = new AnthropicModel({
+  modelId: 'claude-sonnet-5',
+  useNativeTokenCount: true,
+})
+```
+
+When disabled (or if the API call fails), falls back to estimation with a character-based heuristic (characters ÷ 4 for text, characters ÷ 2 for JSON).
+(( /tab "TypeScript" ))
+
+## References
+
+-   [Python API](/harness-sdk/pr-cms-45/docs/api/python/strands.models.model)
+-   [Anthropic](https://platform.claude.com/docs/en/home)
+
+## Related pages
+
+- [Result caching](/harness-sdk/pr-cms-45/docs/user-guide/evals-sdk/how-to/result_caching/index.md) (1 shared tag)
+- [LiteLLM](/harness-sdk/pr-cms-45/docs/user-guide/sdk/model-providers/litellm/index.md) (1 shared tag)
+- [Return structured output](/harness-sdk/pr-cms-45/docs/user-guide/sdk/agents/structured-output/index.md) (1 shared tag)
+- [Structured output similarity evaluator](/harness-sdk/pr-cms-45/docs/user-guide/evals-sdk/evaluators/structured_output_evaluator/index.md) (1 shared tag)
+- [Structured output](/harness-sdk/pr-cms-45/docs/user-guide/sdk/agents/structured-output-behavior/index.md) (1 shared tag)
+- [OpenAI](/harness-sdk/pr-cms-45/docs/user-guide/sdk/model-providers/openai/index.md) (1 shared tag)
+- [Writer](/harness-sdk/pr-cms-45/docs/user-guide/sdk/model-providers/writer/index.md) (1 shared tag)
+- [Amazon Bedrock](/harness-sdk/pr-cms-45/docs/user-guide/sdk/model-providers/amazon-bedrock/index.md) (1 shared tag)
+
+
+## Implementation
+
+### Python
+
+- [harness-sdk/strands-py/src/strands/models/anthropic.py](https://github.com/strands-agents/harness-sdk/blob/main/strands-py/src/strands/models/anthropic.py)
+
+### TypeScript
+
+- [harness-sdk/strands-ts/src/models/anthropic.ts](https://github.com/strands-agents/harness-sdk/blob/main/strands-ts/src/models/anthropic.ts)
