@@ -1,0 +1,137 @@
+# Fork-only docs preview. The upstream "Docs: Deploy Preview" workflow needs the
+# strands-agents runners and the S3/CloudFront secrets, which a fork doesn't have.
+# This one builds on GitHub-hosted runners and publishes each PR to a folder on
+# the docs-previews branch, which GitHub Pages serves at <pages url>/pr-cms-<N>/.
+# Setup: create a docs-previews branch holding an empty .nojekyll file, and set
+# it as the GitHub Pages source (Settings > Pages, branch docs-previews, /).
+name: "Docs: Fork Preview"
+
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize]
+    paths:
+      - 'site/**'
+      - '.github/workflows/docs-*'
+
+# One deploy at a time: every preview pushes to the same branch.
+concurrency:
+  group: docs-fork-preview
+  cancel-in-progress: false
+
+jobs:
+  preview:
+    name: Build and Deploy Preview
+    # Only PRs from branches in this repository: the job checks out PR code with a write token.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: read
+      pull-requests: write
+
+    env:
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      PREVIEW_DIR: pr-cms-${{ github.event.pull_request.number }}
+
+    steps:
+      # The Pages URL depends on the owner's settings (github.io or a custom domain).
+      - name: Find Pages URL
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          url=$(gh api "repos/$GITHUB_REPOSITORY/pages" --jq .html_url)
+          url=${url%/}
+          origin=$(printf '%s' "$url" | sed -E 's#^(https?://[^/]+).*#\1#')
+          echo "PAGES_ORIGIN=$origin" >> "$GITHUB_ENV"
+          echo "PAGES_ROOT=${url#"$origin"}" >> "$GITHUB_ENV"
+
+      - name: Checkout head commit
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ env.PR_HEAD_SHA }}
+          fetch-depth: 0
+          persist-credentials: false
+          allow-unsafe-pr-checkout: true  # opt back into PR-head checkout, blocked by default in checkout@v7
+
+      - name: Checkout samples
+        uses: actions/checkout@v7
+        with:
+          repository: strands-agents/samples
+          path: samples-source
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          check-latest: true
+
+      - name: Install dependencies
+        working-directory: site
+        run: npm ci
+
+      - name: Build CMS
+        working-directory: site
+        env:
+          ASTRO_BASE_PATH: ${{ env.PAGES_ROOT }}/${{ env.PREVIEW_DIR }}/
+          SITE_DOMAIN: ${{ env.PAGES_ORIGIN }}
+          SAMPLES_SOURCE_DIR: ${{ github.workspace }}/samples-source
+          SAMPLES_REQUIRE_SOURCE: '1'
+        run: npm run cms:build
+
+      - name: Checkout docs-previews branch
+        uses: actions/checkout@v7
+        with:
+          ref: docs-previews
+          path: docs-previews
+
+      - name: Publish preview
+        working-directory: docs-previews
+        run: |
+          rsync -a --delete "../site/dist/" "$PREVIEW_DIR/"
+          touch .nojekyll
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git diff --cached --quiet || git commit -q -m "Preview PR #$PR_NUMBER at $PR_HEAD_SHA"
+          git push origin HEAD:docs-previews
+
+      - name: Comment on PR
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const prNumber = context.payload.pull_request.number;
+            const baseUrl = `${process.env.PAGES_ORIGIN}${process.env.PAGES_ROOT}/${process.env.PREVIEW_DIR}`;
+            const files = await github.paginate(github.rest.pulls.listFiles, {
+              owner: context.repo.owner, repo: context.repo.repo, pull_number: prNumber,
+            });
+            const links = [...new Set(files
+              .filter(f => f.status !== 'removed')
+              .map(f => f.filename.match(/^site\/src\/content\/docs\/(.+)\.mdx$/))
+              .filter(Boolean)
+              .map(m => m[1].replace(/(^|\/)index$/, ''))
+              .map(route => route ? `/docs/${route}/` : '/docs/'))]
+              .sort()
+              .map(path => `- [${path}](${baseUrl}${path})`);
+            const body = [
+              '## Documentation Preview Ready',
+              '',
+              `**Preview:** ${baseUrl}/`,
+              ...(links.length ? ['', '**Changed pages:**', '', ...links] : []),
+              '',
+              `GitHub Pages can take a minute or two to publish. _Updated for ${process.env.PR_HEAD_SHA.slice(0, 7)}._`,
+            ].join('\n');
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner, repo: context.repo.repo, issue_number: prNumber,
+            });
+            const existing = comments.find(c => c.user.type === 'Bot' && c.body.includes('Documentation Preview'));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner, repo: context.repo.repo, comment_id: existing.id, body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner, repo: context.repo.repo, issue_number: prNumber, body,
+              });
+            }
