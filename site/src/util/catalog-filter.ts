@@ -23,6 +23,19 @@ export interface CardFilterData {
   sdk: string
 }
 
+/** Reads a card's filter facets from its data-* attributes (see CatalogCard.astro). */
+export function cardFilterData(dataset: Record<string, string | undefined>): CardFilterData {
+  const list = (value: string | undefined) => (value || '').split(' ').filter(Boolean)
+  return {
+    search: dataset.search || '',
+    type: dataset.type || '',
+    languages: list(dataset.langs),
+    badges: list(dataset.badges),
+    maintainedBy: dataset.maintained || '',
+    sdk: dataset.sdk || 'agents',
+  }
+}
+
 const KNOWN_TYPES = new Set<string>(CATALOG_TYPES.map((t) => t.value))
 const KNOWN_LANGUAGES = new Set(['python', 'typescript'])
 const KNOWN_BADGES = new Set(['verified', 'featured', 'new'])

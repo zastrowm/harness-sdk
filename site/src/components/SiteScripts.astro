@@ -27,9 +27,9 @@
     'use strict'
 
     function initShortbread() {
-      // The /integrations drawer embeds pages with `?embed`. Consent is handled
+      // The /integrations modal embeds pages with `?embed`. Consent is handled
       // by the top-level page, so skip the banner inside the iframe — otherwise
-      // it renders over the drawer's content.
+      // it renders over the modal's content.
       if (new URLSearchParams(window.location.search).has('embed')) return
 
       const hostname = window.location.hostname

@@ -12,6 +12,7 @@
  */
 import type { CatalogCardModel } from '../../util/catalog'
 import { pathWithBase } from '../../util/links'
+import { isIntegrationModalId } from '../../util/integration-modal'
 import { AWS_ICON, DOWNLOAD_ICON, GITHUB_ICON, NPM_ICON, PYPI_ICON, STAR_ICON } from './icons'
 import { AWS_MARK_VIEWBOX, MAINTAINED_BY_FLAGS, MAINTAINED_BY_TITLES, TYPE_ICONS, TYPE_LABELS, VERIFIED_ICON } from './types'
 
@@ -29,6 +30,9 @@ const REGISTRY_ICONS: Record<'PyPI' | 'npm', readonly string[]> = { PyPI: PYPI_I
 
 // Internal docs hrefs need the deploy base path; external URLs must not get it.
 const href = card.external ? card.href : pathWithBase(card.href)
+// Integration pages open as a dialog over the catalog; other internal docs (SDK
+// user-guide pages for built-in features) are ordinary links.
+const opensModal = !card.external && isIntegrationModalId(card.href)
 ---
 
 <article
@@ -47,15 +51,16 @@ const href = card.external ? card.href : pathWithBase(card.href)
       </svg>
     </span>
     <div class="cat-card-head">
-      {/* data-cat-entry marks internal docs links for the docs-drawer script
+      {/* data-cat-entry marks integration-page links for the modal script
           (integrations.astro), which intercepts the click and opens the page
-          in a slide-over iframe. Without JS the link navigates normally. */}
+          in a dialog over the catalog. Without JS the link navigates normally. */}
       <a
         class="cat-card-title"
         href={href}
         target={card.external ? '_blank' : undefined}
         rel={card.external ? 'noopener' : undefined}
-        data-cat-entry={card.external ? undefined : card.id}
+        data-cat-entry={opensModal ? card.id : undefined}
+        data-cat-id={card.id}
         title={card.name}
       >
         {card.name}

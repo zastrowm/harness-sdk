@@ -92,13 +92,15 @@ const structuredData = {
 <script type="application/ld+json" set:html={serializeJsonLd(structuredData)} />
 
 <!-- Embed mode: with `?embed` in the URL the page renders chromeless (no site
-     header/sidebar/TOC/footers) for the /integrations docs drawer iframe. The
+     header/sidebar/TOC/footers) for the integration modal's iframe on /integrations. The
      site is statically built, so the switch must run client-side: this inline
      script sets `data-embed` on <html> before first paint and CSS in
-     custom.css hides the chrome. Without JS the page renders normally. -->
+     custom.css hides the chrome. Without JS the page renders normally.
+     `?embed=backdrop` keeps the chrome: an integration page draws the whole
+     catalog page behind its dialog that way (IntegrationModal.astro). -->
 <script is:inline>
   if (new URLSearchParams(location.search).has('embed')) {
-    document.documentElement.dataset.embed = ''
+    document.documentElement.dataset.embed = new URLSearchParams(location.search).get('embed') === 'backdrop' ? 'backdrop' : ''
     // The full page URL is canonical; keep embed views out of search indexes.
     const meta = document.createElement('meta')
     meta.name = 'robots'
