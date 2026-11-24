@@ -1,0 +1,30 @@
+You can contribute to the Strands ecosystem in several ways: improve the core SDK, help with the documentation, or build extensions that others can use.
+
+## SDK contributions
+
+These contributions improve the SDK powering every Strands agent.
+
+| I want to… | What it involves | Guide |
+| --- | --- | --- |
+| Fix a bug | Check for existing issues, submit a PR with tests that verify your fix | [SDK](/harness-sdk/pr-cms-47/docs/contribute/contributing/core-sdk/index.md) |
+| Add a new feature | For small changes, open an issue first. For larger features, write a design document to align on direction | [Feature proposals](/harness-sdk/pr-cms-47/docs/contribute/contributing/feature-proposals/index.md) |
+| Improve the docs | Fix typos, clarify explanations, add examples, or write new guides | [Documentation](/harness-sdk/pr-cms-47/docs/contribute/contributing/documentation/index.md) |
+
+## Extensions
+
+You can share your tools, model providers, plugins, and session managers with the community by publishing them as packages.
+
+| I want to… | What it involves | Guide |
+| --- | --- | --- |
+| Publish an extension | Package your component and publish it so others can use it | [Publishing extensions](/harness-sdk/pr-cms-47/docs/contribute/contributing/extensions/index.md) |
+
+## Community resources
+
+-   [Integrations](/harness-sdk/pr-cms-47/integrations/index.md): Discover community-built extensions
+-   [GitHub Discussions](https://github.com/strands-agents/harness-sdk/discussions): Ask questions, share ideas
+-   [Discord](https://discord.gg/strands): Get real-time help and connect with the Strands team
+-   [Roadmap](https://github.com/orgs/strands-agents/projects/8/views/1): See what we’re working on
+-   [Development Tenets](https://github.com/strands-agents/harness-sdk/blob/main/team/TENETS.md): Principles that guide SDK design
+-   [Decision Records](https://github.com/strands-agents/harness-sdk/blob/main/team/DECISIONS.md): Past design decisions with rationale
+-   [Code of Conduct](https://aws.github.io/code-of-conduct): Community guidelines
+-   [Report a Security Issue](https://aws.amazon.com/security/vulnerability-reporting/): For vulnerabilities, not public issues
