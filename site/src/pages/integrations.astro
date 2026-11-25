@@ -106,6 +106,12 @@ const sidebar = [
     {/* With filters in the URL (a Back or reload to a search), hide the grid and
         count until the page script has filtered them, so the full grid doesn't
         flash first. apply() clears the flag; the timeout covers a failed script. */}
+    {/* Fade to and from integration pages, which opt in the same way (IntegrationModal.astro). */}
+    <style is:inline>
+      @view-transition {
+        navigation: auto;
+      }
+    </style>
     <script is:inline>
       if (/[?&](q|type|lang|badge|by|sdk)=/.test(location.search)) {
         document.documentElement.dataset.catPending = ''

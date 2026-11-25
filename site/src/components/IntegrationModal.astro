@@ -37,6 +37,15 @@ const catalogHref = pathWithBase('/integrations/')
   </div>
 </dialog>
 
+<style is:inline>
+  /* Fade between this page and the catalog when closing (or going Back). Inline
+     so only integration pages and the catalog (integrations.astro) opt in; a
+     cross-document view transition runs only when both pages do. */
+  @view-transition {
+    navigation: auto;
+  }
+</style>
+
 <style is:global>
   /* The dialog scrolls its content; the page behind it stays put. */
   html:has(.integ-modal[open]) {
@@ -186,6 +195,20 @@ const catalogHref = pathWithBase('/integrations/')
       if (action.kind === 'back') history.back()
       else if (action.kind === 'replace') location.replace(action.url)
       else location.assign(action.url)
+    }
+
+    // Prerender the catalog page that closing opens, so close swaps to a page
+    // that is already drawn (with its search applied) instead of loading it.
+    // Chromium only; elsewhere close is a normal navigation. A `back` close
+    // returns to a history entry, which prerendering can't serve.
+    const closeAction = docsCloseAction(ctx)
+    if (closeAction.kind !== 'back' && HTMLScriptElement.supports?.('speculationrules')) {
+      const rules = document.createElement('script')
+      rules.type = 'speculationrules'
+      rules.textContent = JSON.stringify({
+        prerender: [{ source: 'list', urls: [closeAction.url], eagerness: 'immediate' }],
+      })
+      document.head.append(rules)
     }
 
     // Esc: handled on keydown, because without a prior user gesture Chrome closes
