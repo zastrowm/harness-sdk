@@ -2,9 +2,10 @@
    .integ-modal is the box. The catalog page uses it for its iframe dialog
    (.integ-modal--frame), and a directly loaded docs page uses it for the dialog
    that holds its own content (IntegrationModal.astro), so both look the same.
-   Loaded by integrations.astro and IntegrationModal.astro. */
+   Loaded by integrations.astro and IntegrationModal.astro. The `dialog.` prefix
+   outranks catalog.css's margin reset for elements in .cat-page. */
 
-.integ-modal {
+dialog.integ-modal {
   position: fixed;
   inset: 0;
   margin: auto;
@@ -21,7 +22,7 @@
   box-shadow: 0 24px 64px rgb(0 0 0 / 0.35);
   overflow: hidden;
 }
-.integ-modal[open] {
+dialog.integ-modal[open] {
   animation: integ-modal-in 160ms ease-out;
 }
 @keyframes integ-modal-in {
@@ -30,14 +31,14 @@
     transform: translateY(0.5rem) scale(0.99);
   }
 }
-.integ-modal::backdrop {
+dialog.integ-modal::backdrop {
   background: rgb(0 0 0 / 0.5);
   backdrop-filter: blur(2px);
 }
 
 /* Below Starlight's sidebar breakpoint the dialog is a full-screen sheet. */
 @media (max-width: 50rem) {
-  .integ-modal {
+  dialog.integ-modal {
     width: 100vw;
     height: 100dvh;
     border: 0;
@@ -45,7 +46,7 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .integ-modal[open] {
+  dialog.integ-modal[open] {
     animation: none;
   }
 }
