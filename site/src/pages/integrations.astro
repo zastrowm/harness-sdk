@@ -12,10 +12,12 @@ import CatalogFacets from '../components/catalog/CatalogFacets.astro'
 import { CATALOG_TYPES, MAINTAINED_BY_TIERS } from '../components/catalog/types'
 import { toCardModel, sortEntries, type CatalogStatsFile } from '../util/catalog'
 import { pathWithBase } from '../util/links'
+import { FILTER_KNOWN_VALUES, prefilterSelector } from '../util/catalog-filter'
 import { integrationsSchema } from '../util/structured-data'
 import { CATALOG_FEED_PATH } from '../util/catalog-feed'
 import statsFile from '../data/catalog-stats.json'
 import '../styles/catalog.css'
+import '../styles/integration-modal.css'
 
 const stats = statsFile as CatalogStatsFile
 const entries = await getCollection('catalog')
@@ -46,10 +48,32 @@ const maintainedByFacets = MAINTAINED_BY_TIERS.map(({ value, label }) => ({
   count: cards.filter((c) => c.maintainedBy === value).length,
 })).filter((t) => t.count > 0)
 
+// Inline, run before the grid: see prefilterSelector in util/catalog-filter.ts.
+const prefilterScript = `;(function () {
+  var result = (${prefilterSelector.toString()})(location.search, ${JSON.stringify(FILTER_KNOWN_VALUES)})
+  var style = document.createElement('style')
+  style.id = 'cat-prefilter'
+  style.textContent = result.hide + '{display:none}'
+  document.head.appendChild(style)
+  if (result.filtered) document.documentElement.dataset.catPending = ''
+})()`
+
 const title = 'Integrations'
 const description = 'Community-built tools, model providers, plugins, and integrations for Strands Agents.'
 const feedHead = [
   { tag: 'link' as const, attrs: { rel: 'alternate', type: 'application/json', href: pathWithBase(CATALOG_FEED_PATH) } },
+  // The fade (@view-transition below) is for leaving an integration page. Skip it
+  // for every other arrival, such as a sidebar type link, which loads this page
+  // again: there it only slows the switch and fades the old highlight out. Must
+  // be in <head> so it is listening before the first render.
+  {
+    tag: 'script' as const,
+    content: `addEventListener('pagereveal', function (e) {
+  if (!e.viewTransition) return
+  var from = window.navigation && navigation.activation && navigation.activation.from
+  if (!from || !from.url || new URL(from.url).pathname.indexOf('/docs/integrations/') < 0) e.viewTransition.skipTransition()
+})`,
+  },
 ]
 
 // Left sidebar (real Starlight sidebar): browse by type. Each link filters the
@@ -68,6 +92,10 @@ const sidebar = [
 
 <StarlightPage frontmatter={{ title, description, tableOfContents: false, head: feedHead }} sidebar={sidebar}>
   <div class="cat-page">
+    {/* With filters in the URL (a link, a reload, Back), hide the cards they
+        exclude before the grid streams in, so it never shows unfiltered, and hide
+        the count until the page script sets it. apply() removes both. */}
+    <script is:inline set:html={prefilterScript} />
     <div class="cat-head">
       <p class="cat-subtitle">Tools, model providers, and integrations built by the Strands team and community.</p>
       <div class="cat-head-actions">
@@ -102,6 +130,12 @@ const sidebar = [
         hasNew={hasNew}
       />
     </div>
+    {/* Fade to and from integration pages, which opt in the same way (IntegrationModal.astro). */}
+    <style is:inline>
+      @view-transition {
+        navigation: auto;
+      }
+    </style>
     <div class="cat-grid" data-cat-grid>
       {cards.map((card) => <CatalogCard card={card} />)}
       {/* Not a .cat-card: the filter script must never hide this tile. */}
@@ -112,19 +146,11 @@ const sidebar = [
       </div>
     </div>
 
-    {/* Docs drawer: clicking a card whose docs live on this site opens the
-        page in a slide-over iframe (the doc loads with ?embed so it renders
-        chromeless — see overrides/Head.astro). The grid, filters, and scroll
-        position stay live underneath. */}
-    <dialog class="cat-drawer" data-cat-drawer aria-label="Integration documentation">
-      <div class="cat-drawer-bar">
-        <span class="cat-drawer-name" data-cat-drawer-name></span>
-        <a class="cat-drawer-full" data-cat-drawer-full href={pathWithBase('/')}>Open full page ↗</a>
-        <button class="cat-dialog-close" type="button" data-cat-drawer-close aria-label="Close documentation">Esc</button>
-      </div>
-      <iframe class="cat-drawer-frame" data-cat-drawer-frame title="Integration documentation" src="about:blank"
-      ></iframe>
-    </dialog>
+    {/* Integration modal: a card for an integration page opens that page in
+        this dialog (an iframe of the page with ?embed, which draws the same
+        dialog chromeless; see IntegrationModal.astro). The URL becomes the
+        page's own URL, and the grid, filters, and scroll stay underneath. */}
+    <dialog class="integ-modal integ-modal--frame" data-cat-modal aria-label="Integration documentation"></dialog>
     <p class="cat-empty" data-cat-empty hidden>No integrations match the current filters.</p>
 
     <p class="cat-disclaimer">Community packages are maintained by their authors. Review them before production use. Questions? Ask in <a href="https://discord.gg/strands">Discord</a>.</p>
@@ -135,8 +161,14 @@ const sidebar = [
   // Client-side faceted filtering over the statically-rendered cards. The
   // matching + URL-state logic lives in util/catalog-filter (unit-tested);
   // this script only reads the DOM and toggles [hidden].
-  import { matchesFilters, stateToQuery, queryToState, type CardFilterData } from '../util/catalog-filter'
+  import { cardFilterData, matchesFilters, stateToQuery, queryToState } from '../util/catalog-filter'
   import { CATALOG_TYPES } from '../components/catalog/types'
+  import {
+    INTEGRATION_MODAL_CLOSE,
+    INTEGRATION_MODAL_HASH,
+    catalogCloseAction,
+    type IntegrationModalHistoryState,
+  } from '../util/integration-modal'
 
   const cards = Array.from(document.querySelectorAll<HTMLElement>('[data-cat-grid] .cat-card'))
   // The left sidebar's search input, plus the mobile filter bar's stand-in.
@@ -171,27 +203,24 @@ const sidebar = [
   const renderedLangs = new Set(langBtns.map((btn) => btn.dataset.catLang).filter(Boolean))
   for (const l of state.languages) if (!renderedLangs.has(l)) state.languages.delete(l)
 
-  function cardData(el: HTMLElement): CardFilterData {
-    return {
-      search: el.dataset.search || '',
-      type: el.dataset.type || '',
-      languages: (el.dataset.langs || '').split(' ').filter(Boolean),
-      badges: (el.dataset.badges || '').split(' ').filter(Boolean),
-      maintainedBy: el.dataset.maintained || '',
-      sdk: el.dataset.sdk || 'agents',
-    }
-  }
+  // A legacy ?entry=<id> link (the old docs drawer) is read before apply()
+  // rewrites the query; it opens the modal further down.
+  const legacyEntry = new URLSearchParams(location.search).get('entry')
 
   function apply() {
     let visible = 0
     for (const el of cards) {
-      const data = cardData(el)
+      const data = cardFilterData(el.dataset)
       const show = matchesFilters(data, state)
       el.hidden = !show
       if (show) visible++
     }
     if (emptyEl) emptyEl.hidden = visible > 0
     if (countEl) countEl.textContent = String(visible)
+    // The [hidden] flags now match; drop the inline prefilter (it would keep the
+    // URL's first filters applied) and show the count.
+    document.getElementById('cat-prefilter')?.remove()
+    delete document.documentElement.dataset.catPending
 
     // Reflect the active type onto the left sidebar (single-select browse).
     // Starlight marks every /integrations link current by pathname, so clear
@@ -205,6 +234,8 @@ const sidebar = [
       else a.removeAttribute('aria-current')
     })
     if (typeSelect) typeSelect.value = activeType
+    // aria-current is right now, so drop the first-paint highlight (Sidebar.astro).
+    delete document.documentElement.dataset.catType
 
     for (const btn of typeBtns) btn.setAttribute('aria-pressed', String(state.types.has(btn.dataset.catType || '')))
     for (const btn of badgeBtns) btn.setAttribute('aria-pressed', String(state.badges.has(btn.dataset.catBadge || '')))
@@ -218,12 +249,7 @@ const sidebar = [
       btn.setAttribute('aria-checked', String(checked))
     }
 
-    // `entry` (the open docs drawer) is not filter state; carry the current
-    // value through so re-serializing the filters doesn't close the deep link.
-    const params = new URLSearchParams(stateToQuery(state))
-    const entryId = new URLSearchParams(location.search).get('entry')
-    if (entryId) params.set('entry', entryId)
-    const query = params.toString()
+    const query = stateToQuery(state)
     history.replaceState(null, '', (query ? `?${query}` : location.pathname) + location.hash)
   }
 
@@ -279,42 +305,35 @@ const sidebar = [
 
   apply()
 
-  // --- Docs drawer -----------------------------------------------------------
-  // Cards whose docs live on this site open in a slide-over <dialog> with an
-  // iframe (the doc URL gets ?embed, which strips the site chrome — see
-  // overrides/Head.astro) instead of navigating away, so the grid, filters,
-  // and scroll position stay live. External cards are untouched (new tab),
-  // and without JS the links navigate normally.
-  const drawer = document.querySelector<HTMLDialogElement>('[data-cat-drawer]')
-  const drawerFrame = document.querySelector<HTMLIFrameElement>('[data-cat-drawer-frame]')
-  const drawerName = document.querySelector<HTMLElement>('[data-cat-drawer-name]')
-  const drawerFull = document.querySelector<HTMLAnchorElement>('[data-cat-drawer-full]')
+  // --- Integration modal -----------------------------------------------------
+  // A card for an integration page opens that page over the catalog instead of
+  // navigating: the URL becomes the page's own URL (pushState), and the dialog
+  // holds an iframe of the page with ?embed, which draws the same dialog as a
+  // direct visit (IntegrationModal.astro). Close, Esc, a backdrop click, and Back
+  // all return to the catalog URL with the grid, filters, and scroll as they were.
+  // Without JS, or with a modified click, the link navigates normally.
+  const modal = document.querySelector<HTMLDialogElement>('[data-cat-modal]')
+  // A fresh iframe per open: navigating an existing iframe (src = ...) would add
+  // entries to the tab's history, so Back would step through the iframe first.
+  let modalFrame: HTMLIFrameElement | undefined
   const entryLinks = Array.from(document.querySelectorAll<HTMLAnchorElement>('.cat-card [data-cat-entry]'))
   const entryById = new Map(entryLinks.map((a) => [a.dataset.catEntry || '', a]))
+  const entryByPath = new Map(entryLinks.map((a) => [a.pathname, a]))
+  const catalogPath = location.pathname
 
-  // Tracks whether the current open pushed a history entry, so close can undo
-  // it (back button parity); a ?entry deep link on load pushes nothing.
-  let drawerPushed = false
-
-  function drawerUrl(entryId: string | null): string {
-    const params = new URLSearchParams(location.search)
-    if (entryId) params.set('entry', entryId)
-    else params.delete('entry')
-    const query = params.toString()
-    return (query ? `?${query}` : location.pathname) + location.hash
-  }
-
-  function openDrawer(link: HTMLAnchorElement) {
-    if (!drawer || !drawerFrame) return
-    drawerFrame.src = `${link.href.split('#')[0]}?embed`
-    if (drawerName) drawerName.textContent = link.textContent?.trim() || ''
-    if (drawerFull) drawerFull.href = link.href
-    if (!drawer.open) drawer.showModal()
-  }
-
-  function closeDrawer() {
-    if (!drawer?.open) return
-    drawer.close()
+  function openModal(link: HTMLAnchorElement, hash = '') {
+    if (!modal) return
+    const name = link.textContent?.trim() || 'Integration documentation'
+    modal.setAttribute('aria-label', name)
+    const frame = document.createElement('iframe')
+    frame.className = 'integ-modal-frame'
+    frame.title = name
+    frame.src = `${link.pathname}?embed${hash}`
+    modalFrame?.remove()
+    modal.append(frame)
+    modalFrame = frame
+    if (!modal.open) modal.showModal()
+    frame.focus()
   }
 
   for (const link of entryLinks)
@@ -322,44 +341,64 @@ const sidebar = [
       // Modified clicks keep their browser behavior (new tab, etc.).
       if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return
       e.preventDefault()
-      history.pushState({ catEntry: link.dataset.catEntry }, '', drawerUrl(link.dataset.catEntry || null))
-      drawerPushed = true
-      openDrawer(link)
+      const entry: IntegrationModalHistoryState = {
+        integrationModal: true,
+        catalogUrl: location.pathname + location.search,
+        pushed: true,
+      }
+      history.pushState(entry, '', link.pathname)
+      openModal(link)
     })
 
-  drawer?.addEventListener('click', (e) => {
-    // Clicks on the backdrop land on the dialog element itself.
-    if (e.target === drawer) closeDrawer()
-  })
-  document.querySelector('[data-cat-drawer-close]')?.addEventListener('click', closeDrawer)
-
-  // Fires on every close path (Esc, button, backdrop, popstate): unload the
-  // iframe and put the URL back where it was before the drawer opened.
-  drawer?.addEventListener('close', () => {
-    if (drawerFrame) drawerFrame.src = 'about:blank'
-    if (new URLSearchParams(location.search).get('entry')) {
-      if (drawerPushed) history.back()
-      else history.replaceState(null, '', drawerUrl(null))
-    }
-    drawerPushed = false
+  // A click on the dimmed area lands on the dialog element itself.
+  modal?.addEventListener('click', (e) => {
+    if (e.target === modal) modal.close()
   })
 
-  // Back/forward buttons open and close the drawer to match the URL.
+  // Every close path (Esc, the page's close button, a backdrop click, Back) ends
+  // here. Unload the page, then leave the page's URL unless Back already did.
+  modal?.addEventListener('close', () => {
+    modalFrame?.remove()
+    modalFrame = undefined
+    if (!entryByPath.has(location.pathname)) return
+    const action = catalogCloseAction(history.state, catalogPath)
+    if (action.kind === 'back') history.back()
+    else if (action.kind === 'replace') history.replaceState(null, '', action.url)
+  })
+
+  // Messages from the page in the iframe: its close button and Esc, and in-page
+  // anchors, which keep the address bar's #fragment in step for sharing.
+  window.addEventListener('message', (e) => {
+    if (e.origin !== location.origin || e.source !== modalFrame?.contentWindow) return
+    const data = e.data as { type?: string; hash?: string } | null
+    if (data?.type === INTEGRATION_MODAL_CLOSE) modal?.close()
+    else if (data?.type === INTEGRATION_MODAL_HASH && entryByPath.has(location.pathname))
+      history.replaceState(history.state, '', location.pathname + (data.hash || ''))
+  })
+
+  // Back and Forward open and close the modal to match the URL.
   window.addEventListener('popstate', () => {
-    const entryId = new URLSearchParams(location.search).get('entry')
-    const link = entryId ? entryById.get(entryId) : undefined
-    if (link) {
-      drawerPushed = false
-      openDrawer(link)
-    } else {
-      closeDrawer()
-    }
+    const link = entryByPath.get(location.pathname)
+    if (link) openModal(link, location.hash)
+    else if (modal?.open) modal.close()
   })
 
-  // Deep link: /integrations/?entry=<id> opens the drawer on load. Unknown
-  // ids (stale links, external-only entries) are ignored.
-  const initialEntry = new URLSearchParams(location.search).get('entry')
-  const initialLink = initialEntry ? entryById.get(initialEntry) : undefined
-  if (initialLink) openDrawer(initialLink)
-  else if (initialEntry) history.replaceState(null, '', drawerUrl(null))
+  // Legacy deep link /integrations/?entry=<id> (the old docs drawer): open the
+  // modal at the page's own URL. A built-in feature card's docs are an ordinary
+  // page, so go there. Unknown ids were already dropped from the URL by apply().
+  if (legacyEntry) {
+    const link = entryById.get(legacyEntry)
+    const title = document.querySelector<HTMLAnchorElement>(`.cat-card a[data-cat-id="${CSS.escape(legacyEntry)}"]`)
+    if (link) {
+      const entry: IntegrationModalHistoryState = {
+        integrationModal: true,
+        catalogUrl: location.pathname + location.search,
+        pushed: false,
+      }
+      history.replaceState(entry, '', link.pathname)
+      openModal(link)
+    } else if (title && !title.target) {
+      location.replace(title.href)
+    }
+  }
 </script>

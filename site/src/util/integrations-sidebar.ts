@@ -4,6 +4,7 @@ import { CATALOG_TYPES } from '../components/catalog/types'
 import { toCardModel, sortEntries, type CatalogStatsFile } from './catalog'
 import statsFile from '../data/catalog-stats.json'
 import { pathWithBase } from './links'
+import { isIntegrationModalId } from './integration-modal'
 
 type SidebarEntry = StarlightRouteData['sidebar'][number]
 
@@ -43,7 +44,8 @@ export async function buildIntegrationsSidebar(currentSlug: string): Promise<Sid
       collapsed: false,
       badge: undefined,
       entries: [
-        link('All integrations', '/integrations/'),
+        // Integration pages draw the catalog behind their dialog, so the rail matches it.
+        link('All integrations', '/integrations/', isIntegrationModalId(currentSlug)),
         ...typeFacets.map((t) => link(t.label, `/integrations/?type=${t.value}`)),
       ],
     },

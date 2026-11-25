@@ -321,6 +321,18 @@ for every configured product, as above, to start the development server offline.
 - **Centring:** `.sl-markdown-content` is an inline-size container (which stops its first child's top margin collapsing through it, so that margin is set to 0), and each element is moved by `translateX(min(0px, 50cqw - 50%))`. That is 0 for an element no wider than the column and half its overhang for a wider one.
 - Only direct children of `.sl-markdown-content` widen. Inside an aside or a `<TabItem>` they stay at the width of their box. The block stops one 1.5rem panel padding short of the TOC, the sidebar or the window edge, which also absorbs the up to ~8px a classic scrollbar adds to `100vw`.
 
+### 11. Integration Modal (`src/util/integration-modal.ts`, `src/components/IntegrationModal.astro`)
+
+**What it does:** An integration's docs page (`/docs/integrations/<type>/<slug>/`, except `get-featured`) renders as a centred dialog over the `/integrations` catalog, at the page's own URL. The catalog shows the same dialog when a card is clicked, without leaving the page, so both routes look the same.
+
+- **Direct visit:** `PageFrame` renders the header, the catalog rail (from `buildIntegrationsSidebar`, set in `route-middleware.ts`), an empty inert backdrop region and `IntegrationModal`, a server-rendered `<dialog open>` holding Starlight's main column (with no "On this page" column). Its script reopens the dialog with `showModal()` and, at 50rem and up, draws the whole catalog page behind it in an inert, full-window iframe of `/integrations/?embed=backdrop` (embed mode that keeps the chrome). When the visit came from the catalog, the iframe gets the same search and filters. The catalog stays in its own document, so the docs page's DOM holds only the article. Close (the × link, Esc or a click on the dimmed area) goes back to the catalog: `history.back()` when the catalog opened the entry, otherwise a load of the catalog URL.
+- **Catalog click:** a card marked `data-cat-entry` (an integration page, see `CatalogCard.astro`) pushes the page URL and opens a same-sized dialog with a new iframe of `<page>?embed`. Embed mode hides the chrome and the backdrop, and the embedded dialog fills the frame. The page sends close and in-page `#fragment` changes to the catalog by `postMessage`, so the catalog owns the history entry: close, Esc and Back all return to the catalog URL with its search and scroll.
+- Cards for built-in features whose docs are SDK user-guide pages are plain links. A legacy `/integrations/?entry=<id>` link opens the modal at the page URL, or goes to the user-guide page.
+
+**Why:** One view of an integration instead of a slide-over drawer on the catalog and a separate full page. The page stays a normal, server-rendered docs page for search engines, Pagefind, its `index.md` twin and the page actions. The iframe runs the page's own scripts (tabs, `Syntax`, image zoom), which a fetch-and-swap of the content would not.
+
+**Without JS:** the dialog renders open over an empty backdrop and the × is a link to `/integrations/`.
+
 ## Configuration (`astro.config.mjs`)
 
 The main config ties everything together:
@@ -516,7 +528,7 @@ These override default Starlight components:
 - **`Header.astro`**: Custom header with navigation tabs and theme-aware logos (see [Header Navigation](#header-navigation) below).
 - **`Hero.astro`**: Suppresses the Starlight hero on `/blog/` paths. Blog pages pass a dummy `hero: { actions: [] }` to collapse Starlight's two-panel layout, and this override ensures that dummy hero has no visual output.
 - **`MarkdownContent.astro`**: Injects the custom frontmatter banners (experimental, external preview, community, languages) at the top of page content.
-- **`PageFrame.astro`**: Extends Starlight's default `PageFrame` to add a full-width site footer containing the `Copyright` component. The footer spans the content area (respecting sidebar offset) with `--sl-color-bg-nav` background to match the header.
+- **`PageFrame.astro`**: Extends Starlight's default `PageFrame` to add a full-width site footer containing the `Copyright` component. The footer spans the content area (respecting sidebar offset) with `--sl-color-bg-nav` background to match the header. On integration pages it puts the main column in `IntegrationModal` (see [Integration Modal](#11-integration-modal-srcutilintegration-modalts-srccomponentsintegrationmodalastro)).
 - **`PageTitle.astro`**: Renders the H1 (or the product hub hero) with `PageActions` beside it: small "View as Markdown" and "Edit on GitHub" links that sit next to the title when it fits and wrap below it otherwise. The Markdown link shows only on pages with an `/index.md` twin, decided by `src/util/markdown-twin.ts`, which `Head.astro` also uses for its `rel="alternate"` link.
 - **`Sidebar.astro`** and **`SidebarSublist.astro`**: Custom sidebar navigation that mimics MkDocs Material theme's `navigation.sections` behavior.
 

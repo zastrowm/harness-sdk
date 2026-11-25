@@ -1,0 +1,61 @@
+/* Integration modal: one centred dialog for an integration's docs page.
+   .integ-modal is the box. The catalog page uses it for its iframe dialog
+   (.integ-modal--frame), and a directly loaded docs page uses it for the dialog
+   that holds its own content (IntegrationModal.astro), so both look the same.
+   Loaded by integrations.astro and IntegrationModal.astro. The `dialog.` prefix
+   outranks catalog.css's margin reset for elements in .cat-page. */
+
+dialog.integ-modal {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  box-sizing: border-box;
+  width: min(60rem, calc(100vw - 4rem));
+  height: calc(100dvh - 4rem);
+  max-width: none;
+  max-height: none;
+  padding: 0;
+  border: 1px solid var(--sl-color-gray-5);
+  border-radius: 0.75rem;
+  background: var(--sl-color-bg);
+  color: var(--sl-color-text);
+  box-shadow: 0 24px 64px rgb(0 0 0 / 0.35);
+  overflow: hidden;
+}
+dialog.integ-modal[open] {
+  animation: integ-modal-in 160ms ease-out;
+}
+@keyframes integ-modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem) scale(0.99);
+  }
+}
+dialog.integ-modal::backdrop {
+  background: rgb(0 0 0 / 0.5);
+  backdrop-filter: blur(2px);
+}
+
+/* Below Starlight's sidebar breakpoint the dialog is a full-screen sheet. */
+@media (max-width: 50rem) {
+  dialog.integ-modal {
+    width: 100vw;
+    height: 100dvh;
+    border: 0;
+    border-radius: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  dialog.integ-modal[open] {
+    animation: none;
+  }
+}
+
+/* Catalog side: the dialog only holds the iframe. */
+.integ-modal-frame {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: var(--sl-color-bg);
+}

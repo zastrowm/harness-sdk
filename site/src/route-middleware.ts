@@ -11,6 +11,7 @@ import { pathWithBase } from './util/links'
 import { navLinks, type NavLink } from './config/navbar'
 import { isNew, NEW_BADGE } from './util/new-badge'
 import { buildIntegrationsSidebar } from './util/integrations-sidebar'
+import { isIntegrationModalId } from './util/integration-modal'
 import { buildLastModMap, getGitPrefix } from './util/git-dates'
 import { isSampleGuidePath } from './util/sample-guides'
 
@@ -178,10 +179,12 @@ export const onRequest = defineRouteMiddleware(async (context) => {
     return
   }
 
-  // Integration pages hide the sidebar so they render at Starlight's sidebar-less width.
-  if (currentSlug === 'docs/integrations' || currentSlug.startsWith('docs/integrations/')) {
-    starlightRoute.hasSidebar = false
-    starlightRoute.sidebar = []
+  // Integration pages render as a dialog over the catalog (PageFrame,
+  // IntegrationModal.astro): the rail behind it is the catalog's, and the dialog
+  // has no room for an "On this page" column.
+  if (isIntegrationModalId(currentSlug)) {
+    starlightRoute.sidebar = applyCollapse(await buildIntegrationsSidebar(currentSlug))
+    starlightRoute.toc = undefined
     starlightRoute.pagination = { prev: undefined, next: undefined }
     return
   }

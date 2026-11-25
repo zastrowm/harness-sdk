@@ -3,11 +3,18 @@
  * PageFrame override — matches Starlight's default PageFrame. The homepage
  * carries the full site footer; docs pages omit it to keep the reading view
  * focused.
+ *
+ * Integration docs pages (util/integration-modal.ts) put the main column in
+ * IntegrationModal's dialog, with an empty backdrop region where the catalog
+ * grid is drawn behind it.
  */
 import MobileMenuToggle from 'virtual:starlight/components/MobileMenuToggle'
+import IntegrationModal from '../IntegrationModal.astro'
 import { currentProduct } from '../../util/current-product'
+import { isIntegrationModalId } from '../../util/integration-modal'
 
-const { hasSidebar } = Astro.locals.starlightRoute
+const { hasSidebar, id } = Astro.locals.starlightRoute
+const integrationModal = isIntegrationModalId(id)
 
 // Product accent for the docs chrome (styled in custom.css). Labs is not a
 // product; the path check mirrors the /labs slug in Sidebar.astro.
@@ -28,7 +35,20 @@ const accent =
       </div>
     </nav>
   )}
-  <div class="main-frame"><slot /></div>
+  {
+    integrationModal ? (
+      <>
+        <div class="main-frame" data-integ-backdrop inert aria-hidden="true" />
+        <IntegrationModal>
+          <slot />
+        </IntegrationModal>
+      </>
+    ) : (
+      <div class="main-frame">
+        <slot />
+      </div>
+    )
+  }
 </div>
 
 <style>

@@ -17,7 +17,7 @@ export interface CatalogStats {
 export type CatalogStatsFile = Record<string, CatalogStats>
 
 export interface CatalogCardModel {
-  /** Entry id (filename without .yaml) — keys the docs-drawer `?entry=` deep link. */
+  /** Entry id (filename without .yaml) — keys the legacy `?entry=` deep link and the card markup. */
   id: string
   name: string
   description: string
