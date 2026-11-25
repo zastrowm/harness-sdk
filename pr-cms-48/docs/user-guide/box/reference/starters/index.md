@@ -64,4 +64,4 @@ project = "write"
 | `description` | Required. What the policy menu shows beside the label. |
 | `project` | The [`[project] access`](/harness-sdk/pr-cms-48/docs/user-guide/box/profiles/index.md#project-access) that a profile made from this policy gets: `"write"`, `"read"`, or `"none"`. Without it, the profile gets no `[project]` table, so the agent can’t reach your project until you add one. |
 
-[Starters](https://github.com/strands-agents/box/blob/ce59c0e5d405405c5340ca3c1a0b10334e91318a/docs/design/cli/starters.md) and [Detection](https://github.com/strands-agents/box/blob/ce59c0e5d405405c5340ca3c1a0b10334e91318a/docs/design/cli/detection.md) explain how `box` reads a starter and answers its questions, for background.
+[Starters](https://github.com/strands-agents/box/blob/526b5a0cf70e792fb1e5e9ca9b11ba0ed58f3ba6/docs/design/cli/starters.md) and [Detection](https://github.com/strands-agents/box/blob/526b5a0cf70e792fb1e5e9ca9b11ba0ed58f3ba6/docs/design/cli/detection.md) explain how `box` reads a starter and answers its questions, for background.

@@ -90,7 +90,7 @@ Each run has a folder in `~/.strands/box/r/`, named by its box ID, such as `b-5b
 
 A new run that fails before the box starts leaves no folder. Every other run folder stays until you clean it up, and storage stays until you delete it.
 
-Two more items in `~/.strands/box` need no edits. `installation.toml` holds the choice made with `box telemetry` and the random ID that [usage telemetry](https://github.com/strands-agents/box/blob/ce59c0e5d405405c5340ca3c1a0b10334e91318a/CLI_TELEMETRY.md) sends. `packages/` holds each release that [the installer](/harness-sdk/pr-cms-48/docs/user-guide/box/install/index.md#what-the-installer-adds) put on this computer. [Upgrade or choose a version](/harness-sdk/pr-cms-48/docs/user-guide/box/install/index.md#upgrade-or-choose-a-version) says which old releases you can delete.
+Two more items in `~/.strands/box` need no edits. `installation.toml` holds the choice made with `box telemetry` and the random ID that [usage telemetry](https://github.com/strands-agents/box/blob/526b5a0cf70e792fb1e5e9ca9b11ba0ed58f3ba6/CLI_TELEMETRY.md) sends. `packages/` holds each release that [the installer](/harness-sdk/pr-cms-48/docs/user-guide/box/install/index.md#what-the-installer-adds) put on this computer. [Upgrade or choose a version](/harness-sdk/pr-cms-48/docs/user-guide/box/install/index.md#upgrade-or-choose-a-version) says which old releases you can delete.
 
 ## Deleting files
 
