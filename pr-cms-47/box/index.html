@@ -96,10 +96,20 @@
 
     // shortbread.js loads with `defer`, so AWSCShortbread is not defined at parse time.
     // Deferred scripts are guaranteed to execute before DOMContentLoaded fires.
+    // A prerendered page (the integration modal prerenders the catalog) waits
+    // until the reader actually opens it, so consent and analytics see only real
+    // page views.
+    function start() {
+      if (document.prerendering) {
+        document.addEventListener('prerenderingchange', initShortbread, { once: true })
+      } else {
+        initShortbread()
+      }
+    }
     if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', initShortbread)
+      document.addEventListener('DOMContentLoaded', start)
     } else {
-      initShortbread()
+      start()
     }
   })()
 </script><!--

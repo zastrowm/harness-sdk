@@ -83,10 +83,20 @@
 
     // shortbread.js loads with `defer`, so AWSCShortbread is not defined at parse time.
     // Deferred scripts are guaranteed to execute before DOMContentLoaded fires.
+    // A prerendered page (the integration modal prerenders the catalog) waits
+    // until the reader actually opens it, so consent and analytics see only real
+    // page views.
+    function start() {
+      if (document.prerendering) {
+        document.addEventListener('prerenderingchange', initShortbread, { once: true })
+      } else {
+        initShortbread()
+      }
+    }
     if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', initShortbread)
+      document.addEventListener('DOMContentLoaded', start)
     } else {
-      initShortbread()
+      start()
     }
   })()
 </script><!--
@@ -1088,4 +1098,11 @@ are prefixed with the gateway name, for example <code dir="auto">orcarouter/auto
 <li><a href="https://docs.orcarouter.ai">OrcaRouter docs</a></li>
 <li><a href="https://www.orcarouter.ai/models">OrcaRouter model catalog</a></li>
 <li><a href="/harness-sdk/pr-cms-47/docs/user-guide/sdk/model-providers/openai/">OpenAI provider</a></li>
-</ul><script type="module">function e(){document.querySelectorAll(`aside.page-tags`).forEach(e=>{let t=e.querySelectorAll(`.page-tags__pill`),n=e.querySelectorAll(`.page-tags__panel`),r=e.querySelectorAll(`[data-action="close"]`);function i(e){t.forEach(t=>{let n=t.dataset.tag===e;t.setAttribute(`aria-expanded`,String(n)),t.classList.toggle(`is-active`,n)}),n.forEach(t=>{t.hidden=t.dataset.tag!==e})}t.forEach(e=>{e.addEventListener(`click`,()=>{i(e.classList.contains(`is-active`)?null:e.dataset.tag??null)})}),r.forEach(e=>e.addEventListener(`click`,()=>i(null)))})}document.readyState===`loading`?document.addEventListener(`DOMContentLoaded`,e):e();</script></div><footer class="sl-flex astro-ddtxxk7k"><div class="meta sl-flex astro-ddtxxk7k"><p>Last updated: <time datetime="2026-09-21T18:03:27.000Z">Sep 21, 2026</time></p></div><div class="pagination-links print:hidden astro-b5raizh3" dir="ltr"></div></footer><div class="site-footer print:hidden astro-ft5hcqwl" data-pagefind-ignore><p class="site-footer__row astro-ft5hcqwl"><a href="https://github.com/strands-agents/harness-sdk/issues/new?template=documentation_improvement.yml&amp;documentation-section=http%3A%2F%2Fgithub.programdotrun.com%2Fharness-sdk%2Fpr-cms-47%2Fdocs%2Fintegrations%2Fmodel-providers%2Forcarouter%2F" target="_blank" rel="noopener" class="astro-ft5hcqwl">Open an issue</a><a href="https://discord.gg/strands" target="_blank" rel="noopener" class="astro-ft5hcqwl">Ask on Discord</a></p><ul class="site-footer__legal astro-ft5hcqwl" role="list"><li class="astro-ft5hcqwl"><a href="https://aws.amazon.com/privacy/" class="astro-ft5hcqwl" target="_blank" rel="noopener">Privacy</a></li><li class="astro-ft5hcqwl"><a href="https://aws.amazon.com/terms/" class="astro-ft5hcqwl" target="_blank" rel="noopener">Site terms</a></li><li class="astro-ft5hcqwl"><a href="https://github.com/strands-agents/harness-sdk/blob/main/LICENSE.APACHE" class="astro-ft5hcqwl" target="_blank" rel="noopener">License</a></li><li class="astro-ft5hcqwl"><a href="https://aws.amazon.com/legal/cookies/" class="astro-ft5hcqwl" target="_blank" rel="noopener">Cookies</a></li><li class="astro-ft5hcqwl"><a href="#" id="cookie-preferences" class="astro-ft5hcqwl">Preferences</a></li><li class="site-footer__muted astro-ft5hcqwl">&copy; 2026 Amazon Web Services, Inc. or its affiliates</li></ul></div><script type="module" src="/harness-sdk/pr-cms-47/_astro/Footer.astro_astro_type_script_index_0_lang.BusNNuvG.js"></script></div></div></main></div></div></div></dialog><script type="module" src="/harness-sdk/pr-cms-47/_astro/IntegrationModal.astro_astro_type_script_index_0_lang.DyhoL0EJ.js"></script></div></body></html>
+</ul><script type="module">function e(){document.querySelectorAll(`aside.page-tags`).forEach(e=>{let t=e.querySelectorAll(`.page-tags__pill`),n=e.querySelectorAll(`.page-tags__panel`),r=e.querySelectorAll(`[data-action="close"]`);function i(e){t.forEach(t=>{let n=t.dataset.tag===e;t.setAttribute(`aria-expanded`,String(n)),t.classList.toggle(`is-active`,n)}),n.forEach(t=>{t.hidden=t.dataset.tag!==e})}t.forEach(e=>{e.addEventListener(`click`,()=>{i(e.classList.contains(`is-active`)?null:e.dataset.tag??null)})}),r.forEach(e=>e.addEventListener(`click`,()=>i(null)))})}document.readyState===`loading`?document.addEventListener(`DOMContentLoaded`,e):e();</script></div><footer class="sl-flex astro-ddtxxk7k"><div class="meta sl-flex astro-ddtxxk7k"><p>Last updated: <time datetime="2026-09-21T18:03:27.000Z">Sep 21, 2026</time></p></div><div class="pagination-links print:hidden astro-b5raizh3" dir="ltr"></div></footer><div class="site-footer print:hidden astro-ft5hcqwl" data-pagefind-ignore><p class="site-footer__row astro-ft5hcqwl"><a href="https://github.com/strands-agents/harness-sdk/issues/new?template=documentation_improvement.yml&amp;documentation-section=http%3A%2F%2Fgithub.programdotrun.com%2Fharness-sdk%2Fpr-cms-47%2Fdocs%2Fintegrations%2Fmodel-providers%2Forcarouter%2F" target="_blank" rel="noopener" class="astro-ft5hcqwl">Open an issue</a><a href="https://discord.gg/strands" target="_blank" rel="noopener" class="astro-ft5hcqwl">Ask on Discord</a></p><ul class="site-footer__legal astro-ft5hcqwl" role="list"><li class="astro-ft5hcqwl"><a href="https://aws.amazon.com/privacy/" class="astro-ft5hcqwl" target="_blank" rel="noopener">Privacy</a></li><li class="astro-ft5hcqwl"><a href="https://aws.amazon.com/terms/" class="astro-ft5hcqwl" target="_blank" rel="noopener">Site terms</a></li><li class="astro-ft5hcqwl"><a href="https://github.com/strands-agents/harness-sdk/blob/main/LICENSE.APACHE" class="astro-ft5hcqwl" target="_blank" rel="noopener">License</a></li><li class="astro-ft5hcqwl"><a href="https://aws.amazon.com/legal/cookies/" class="astro-ft5hcqwl" target="_blank" rel="noopener">Cookies</a></li><li class="astro-ft5hcqwl"><a href="#" id="cookie-preferences" class="astro-ft5hcqwl">Preferences</a></li><li class="site-footer__muted astro-ft5hcqwl">&copy; 2026 Amazon Web Services, Inc. or its affiliates</li></ul></div><script type="module" src="/harness-sdk/pr-cms-47/_astro/Footer.astro_astro_type_script_index_0_lang.BusNNuvG.js"></script></div></div></main></div></div></div></dialog><style>
+  /* Fade between this page and the catalog when closing (or going Back). Inline
+     so only integration pages and the catalog (integrations.astro) opt in; a
+     cross-document view transition runs only when both pages do. */
+  @view-transition {
+    navigation: auto;
+  }
+</style><script type="module" src="/harness-sdk/pr-cms-47/_astro/IntegrationModal.astro_astro_type_script_index_0_lang.Cnsa1PkW.js"></script></div></body></html>
