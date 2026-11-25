@@ -20919,6 +20919,7 @@ Give your coding agent current Strands documentation by connecting the local doc
 
 - [Choosing an Agent Foundation](/harness-sdk/pr-cms-48/docs/user-guide/migrate/choosing-an-agent-foundation/index.md) (1 shared tag)
 - [Get started](/harness-sdk/pr-cms-48/docs/user-guide/sdk/quickstart/overview/index.md) (1 shared tag)
+- [Optimization quickstart](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/quickstart/index.md) (1 shared tag)
 - [Python Quickstart](/harness-sdk/pr-cms-48/docs/user-guide/sdk/quickstart/python/index.md) (1 shared tag)
 - [Strands evaluation quickstart](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/quickstart/index.md) (1 shared tag)
 - [Strands Shell quickstart](/harness-sdk/pr-cms-48/docs/user-guide/shell/quickstart/index.md) (1 shared tag)
@@ -31063,6 +31064,1733 @@ Source: http://github.programdotrun.com/harness-sdk/pr-cms-48/docs/user-guide/ev
 
 ---
 
+## Optimization
+
+Optimization answers **“what should I change about my agent to do its task better?”** You declare what may change (the system prompt, a tool description, a skill, the context manager, the model, a temperature) and provide an [experiment](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/how-evaluation-works/index.md#what-an-evaluation-is-made-of) that measures how well the agent does its task: one you already have, or a new one built for this.
+
+The optimizer then builds versions of your agent, each with a different mix of the allowed changes. It runs every version on the experiment’s cases, scores it with the experiment’s evaluators, and returns the best version it found: a diff for any text it rewrote, and the new values for everything else, such as a model or a temperature.
+
+It never edits your code. You review the result and apply it yourself. The optimizer lives in `strands_evals.optimization` and needs the `optimization` extra: `pip install 'strands-agents-evals[optimization]'`.
+
+## Let your coding assistant set it up
+
+If you’d rather not write the run by hand, the evals SDK ships an `optimize` [agent skill](https://agentskills.io) that guides the coding assistant you already use (Claude Code, Kiro, or any assistant that reads skills) through it. The skill works with agents built with the Strands harness, from an `agent.py` or `agent.ts` file, and with Python tunable factories. It asks what may change, what “better” means, any limits, and how much to spend, all in plain language. It then shows you the exact command to review, runs it with progress, and reports what won. It never applies the result unless you ask.
+
+### Install the skills
+
+**Using a coding agent?** Copy this prompt into Codex, Claude Code, Kiro, or any coding assistant and it will install strands-agents-evals and set up its skills in that assistant.
+
+Copy prompt
+
+To install them yourself instead: the skills ship inside the `strands-agents-evals` package. Install them into your coding assistant with the [`skills` CLI](https://github.com/vercel-labs/skills), run from the environment where you installed the package:
+
+```bash
+npx skills add "$(python -c 'import strands_evals, pathlib; print(pathlib.Path(strands_evals.__file__).parent / ".agents" / "skills")')" --copy
+```
+
+`--copy` copies the skills into your project, so they keep working if that environment is deleted. Run the command again after you upgrade `strands-agents-evals`. To install only some of them, add `-s <name>`; to pick an assistant, add `-a claude-code`; to install for every project, add `-g`. If the command reports `Local path does not exist`, the package is an editable install from a checkout: use `<checkout>/.agents/skills` as the path instead.
+
+## Why optimize instead of tweaking by hand?
+
+Hand tuning works until there are more than two knobs. Then every change needs a full eval run, one lucky run looks like a win, and nobody remembers which combination was tried.
+
+**Tweaking by hand:**
+
+-   One change at a time, judged on whatever cases you happened to rerun
+-   A single noisy run decides what you keep
+-   No record of what was tried or why it lost
+
+**Optimizing:**
+
+-   Prompts, components, and numbers searched together, within a rollout budget you set
+-   The winner is picked on cases the search never saw, then compared with your current agent on a third set of cases
+-   Every trial is saved, so a killed run resumes without paying twice
+
+## Quick example
+
+Mark the parameters that may change, then hand the factory and your experiment to an `Optimizer`:
+
+```python
+from strands import Agent
+from strands.models import BedrockModel
+from strands_evals import Case, Experiment
+from strands_evals.evaluators import HelpfulnessEvaluator
+from strands_evals.optimization import Float, Optimizer, TextValue, tunable
+
+
+@tunable(system_prompt=TextValue(), temperature=Float(0.0, 1.0))
+def create_agent(
+    system_prompt="You are a friendly support agent. Chat with the customer.",
+    temperature=0.7,
+):
+    return Agent(
+        model=BedrockModel(temperature=temperature),
+        system_prompt=system_prompt,
+        callback_handler=None,
+    )
+
+
+experiment = Experiment(
+    cases=[
+        Case(name="late-package", input="My package hasn't arrived after two weeks."),
+        Case(name="return", input="How do I return a damaged item?"),
+        # ... more cases
+    ],
+    evaluators=[HelpfulnessEvaluator()],
+)
+
+result = Optimizer(experiment, create_agent).run()
+print(result.summary())
+```
+
+The parameter defaults are the baseline, and `create_agent()` still builds that baseline with no optimizer present.
+
+## How it works
+
+```mermaid
+flowchart LR
+    A[Declare what may change] --> B[Split cases<br/>train / validation / test]
+    B --> C[Search on train]
+    C --> D[Pick the champion<br/>on validation]
+    D --> E[Report champion vs baseline<br/>on test]
+    E --> F[Diff + values<br/>for you to apply]
+```
+
+1.  **Split.** Your cases are split once into train, validation, and test (40/30/30 by default, seeded).
+2.  **Search on train.** Each step proposes a few new configurations from the best one so far. Every candidate runs on every train case and your evaluators score it. A statistical model (one per metric) is refit after each step and ranks everything measured so far. By default, a model rewrites text values from the agent’s own conversations, and Bayesian optimization (TPE) picks choices and numbers.
+3.  **Pick on validation.** When the budget runs out, the top few candidates and your current agent run on validation. The champion is the best one that meets every constraint. If nothing beats your current agent, your current agent wins. That’s a valid result, not a failure.
+4.  **Report on test.** The champion and your current agent are compared on the test cases with a paired 90% interval. The report never changes the pick.
+
+We chose a fit over “highest measured mean” because each candidate runs on few cases, often once. The fit pools evidence across candidates that share an option, so it ranks more reliably and tells you which options actually moved a metric.
+
+## Optimization vs evaluation
+
+| Aspect | Evaluation | Optimization |
+| --- | --- | --- |
+| **Question** | “How good is this agent?” | “Which version of this agent is best?” |
+| **Input** | An `Experiment` and one agent | The same `Experiment` and a declaration of what may change |
+| **Runs** | Each case once | Each candidate on the train cases, finalists on validation, two arms on test |
+| **Output** | Scores per case | A champion, a diff, typed values, and a test report |
+| **Changes your agent** | No | No: you apply the result |
+
+**Use together:** the experiment is how the optimizer judges each configuration, so the optimizer can only be as good as its evaluators. To build one first, see [Run your first evaluation](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/quickstart/index.md#run-your-first-evaluation).
+
+## What you can optimize
+
+Any part of the agent its factory builds from a parameter: prompts and other text, files, skills, tool descriptions, which tools or skills load, components such as the model or the context strategy, and numbers such as a temperature, across one agent or a multi-agent system. [Declaring what can change](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/tunables/index.md#the-markers) lists every kind of value.
+
+You can run it from Python, from the `strands-evals optimize` command line, or straight from a Strands harness config file or an exported `agent.py` or `agent.ts` file. [Choosing an entry route](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/entry_routes/index.md) compares them.
+
+## Best practices
+
+-   **Get the evaluators right first.** The optimizer finds whatever your evaluators reward, including their blind spots. Read a few judge reasons before you optimize against them.
+-   **Give it enough cases.** The cases are split three ways, so use twenty or more. With 10 cases the test split has 3, and its intervals are too wide to tell you much.
+-   **Price what you care about.** If cost matters, put tokens in the objective or add a constraint. An objective that ignores the model happily picks the most expensive one.
+-   **Start small, then widen.** Run a 120-rollout pass on two or three knobs first. It’s cheap, and it catches a broken evaluator before you spend 500 rollouts.
+-   **Read the test report before shipping.** It’s the only number from cases nothing else touched.
+
+## Next steps
+
+-   [Quickstart](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/quickstart/index.md): Optimize a support-ticket triage agent end to end
+-   [Declaring what can change](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/tunables/index.md): Every marker, plus advanced examples such as context strategies and component swaps
+-   [Choosing an entry route](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/entry_routes/index.md): Python factory, your own task, the CLI, or an agent file, and what each one can’t do
+-   [Objectives, constraints, and budget](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/objectives/index.md): Say what “better” means and how much to spend
+-   [Customizing the search](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/search/index.md): Pick the proposer for each value, including Thompson sampling for choices
+-   [Reading the results](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/results/index.md): The summary, the diff, the effects, and resuming a run
+
+## Related documentation
+
+-   [Getting Started](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/quickstart/index.md): Build the experiment the optimizer reads
+-   [Evaluators Overview](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/evaluators/index.md): The metrics the optimizer scores against
+-   [Command-line interface](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/cli/index.md): The other `strands-evals` commands
+
+Source: http://github.programdotrun.com/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/index.md
+
+---
+
+## Choosing an entry route
+
+The optimizer needs two things from you: a way to build the agent, and a declaration of what may change. How you supply them depends on how your agent is defined. There are four routes. They run the same search and return the same results; they differ in what they can reach.
+
+| Your agent is defined as… | Use | Runs from |
+| --- | --- | --- |
+| A Python function that returns an agent | A tunable factory | Python or the CLI |
+| Anything else you can call from Python | Your own task function and a space | Python or the CLI |
+| A Strands harness config file (JSON) | `--config` and `--tune` | The CLI |
+| An agent file from the strands CLI’s `/export` (Python or TypeScript) | `--agent agent.py` or `--agent agent.ts` | The CLI |
+
+**Use a tunable factory if you can.** It’s the most direct route to every marker, and, like an agent file, it checks every candidate builds before spending a rollout on it. Reach for the others when your agent isn’t a Python function, or when you’d rather not write optimizer code.
+
+All four routes need an [experiment](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/how-evaluation-works/index.md#what-an-evaluation-is-made-of) to evaluate each configuration with: an existing one, or a new one with cases from the agent’s task and evaluators for what you care about. On the command line it’s a JSON file written with `experiment.to_file("experiment.json")`.
+
+## A tunable factory
+
+This is the route the [quickstart](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/quickstart/index.md) uses: decorate the function that builds your agent, then pass it to the optimizer.
+
+```python
+from strands import Agent
+from strands_evals import Case, Experiment
+from strands_evals.evaluators import HelpfulnessEvaluator
+from strands_evals.optimization import Optimizer, TextValue, tunable
+
+
+@tunable(system_prompt=TextValue())
+def create_agent(system_prompt="You are a support agent for Acme Shop."):
+    return Agent(system_prompt=system_prompt, callback_handler=None)
+
+
+experiment = Experiment(
+    cases=[Case(name=f"q{i}", input=f"Customer question {i}") for i in range(20)],
+    evaluators=[HelpfulnessEvaluator()],
+)
+optimizer = Optimizer(experiment, create_agent)
+```
+
+From the CLI, point `--agent` at the factory as `module:attribute` or `path/to/file.py:attribute`:
+
+```bash
+strands-evals optimize run experiment.json --agent agent.py:create_agent
+```
+
+Two optional hooks change how each trial runs. A custom **rollout** runs one case with a fresh agent, for multi-turn conversations or a simulated user. An **environment** creates per-trial resources, such as a sandbox, and passes them to the factory by name. A tunable factory takes both. A config file and an exported agent file take a rollout; an agent file accepts an environment too, but its resources don’t reach the agent. Your own task function takes neither, because the task is the rollout.
+
+**Limitations:**
+
+-   Your agent has to be built by one Python function. Everything that varies must be one of its parameters.
+-   Usage metrics and trace-level evaluators (Helpfulness, GoalSuccessRate, and the other evaluators that read the trajectory) need a Strands agent running in-process. A non-Strands agent reports no usage, and those evaluators fail on every trial.
+
+## Your own task function
+
+When the agent isn’t built by a Python function you can decorate (it’s loaded from your own config format, say, or runs behind an API), write a `build_task` function instead. The optimizer calls it once per candidate with the candidate’s values, and it returns the task `Experiment` runs on each case:
+
+```python
+from strands import Agent
+from strands.models import BedrockModel
+from strands_evals import Case, Experiment
+from strands_evals.evaluators import HelpfulnessEvaluator
+from strands_evals.optimization import Float, Optimizer, TextValue
+
+space = {
+    "instructions": TextValue(default="You are a support agent for Acme Shop."),
+    "temperature": Float(0.0, 1.0, default=0.3),
+}
+
+
+def build_task(ctx):
+    def task(case):
+        # Build the agent per case, never once per candidate: a shared agent carries state
+        agent = Agent(
+            system_prompt=ctx.values["instructions"],
+            model=BedrockModel(temperature=ctx.values["temperature"]),
+            callback_handler=None,
+        )
+        return str(agent(case.input))
+
+    return task
+
+
+experiment = Experiment(
+    cases=[Case(name=f"q{i}", input=f"Customer question {i}") for i in range(20)],
+    evaluators=[HelpfulnessEvaluator()],
+)
+optimizer = Optimizer(experiment, build_task=build_task, space=space)
+```
+
+The space uses the same markers as a factory. When the space holds file markers, the context’s workspace is the candidate’s copy of those files, so you can load a whole edited config from it.
+
+From the CLI, give both functions as `module:attribute`:
+
+```bash
+strands-evals optimize run experiment.json \
+  --build-task tasks.py:build_task --space tasks.py:space
+```
+
+**Limitations:**
+
+-   `Int`, `Float`, and the text markers need an explicit default, because there’s no function parameter to read one from. A `OneOf` falls back to its first option.
+-   A fresh agent per trial is your job. Nothing checks it, and an agent shared across cases leaks conversation state into the scores.
+-   Candidates that can’t be built aren’t caught before scoring. Each of their trials is scored as an agent failure instead.
+-   The task is the rollout, so there’s no custom rollout or environment hook. Create per-trial resources inside the task.
+-   Usage and trace-level evaluators still need a Strands agent in the same process. A separate process, such as a TypeScript service, reports no usage.
+
+## A Strands harness config file
+
+If your agent is a [Strands harness](/harness-sdk/pr-cms-48/docs/user-guide/harness/index.md) portable config, you can optimize it with no Python of your own. The config’s `instructions` are tuned by default, and each `--tune` adds a field by its dotted path:
+
+```json
+{
+  "name": "support",
+  "instructions": "You are a friendly support agent. Chat with the customer.",
+  "model": "bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0",
+  "effort": "auto",
+  "skills": "./skills",
+  "contextManager": "auto",
+  "builtinTools": { "*": false, "subagent": { "maxDepth": 1 } }
+}
+```
+
+```bash
+strands-evals optimize run experiment.json --config agent.json \
+  --tune skills \
+  --tune 'effort=["auto", "off", "low"]' \
+  --tune 'contextManager=["auto", "agentic"]' \
+  --tune 'builtinTools.subagent.maxDepth=int:0..2'
+```
+
+Each `--tune` takes one of four forms:
+
+| Form | Declares |
+| --- | --- |
+| `--tune PATH` | A text field, rewritten by the text rewriter. `skills` makes each skill’s `SKILL.md` tunable |
+| `--tune 'PATH=["a", "b"]'` | A choice among JSON values, lists and objects included; the config’s current value is the baseline |
+| `--tune PATH=int:LO..HI` | An integer in an inclusive range |
+| `--tune PATH=float:LO..HI` | A number in an inclusive range |
+
+A choice’s options may be lists or objects, which is how you search tool sets. With `"builtinTools": ["read"]` in the config, this compares no built-in tools, read only, and read plus edit:
+
+```bash
+--tune 'builtinTools=[[], ["read"], ["read", "edit"]]'
+```
+
+Each option is one whole set, not a subset search.
+
+A skill set works the same way. With `skills` written as a list of folders in the config, `--tune 'skills=[["./skills/returns"], ["./skills/returns", "./skills/shipping"]]'` chooses which skills load. It can’t be combined with `--tune skills`, which rewrites the skills, because both name the same path. To choose skills and rewrite them in one run, use a [tunable factory](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/tunables/index.md#choose-which-skills-load).
+
+Pass `--no-tune-instructions` to leave the instructions alone. Every choice and range is checked against the harness’s own schema before the run starts, so a value no trial could use is an error, not a wasted rollout. The diff lands on `agent.json` itself; the file is never written.
+
+Each trial builds a fresh harness with an empty session folder and a copy of the memory folder, so trials never see each other’s state.
+
+**Limitations:**
+
+-   **No model parameters.** The config has no temperature field, so temperature can’t be tuned here. `model` and `effort` can be choices. Use a tunable factory to tune sampling.
+-   **No components.** Choices take JSON values (strings, numbers, lists, objects), never constructed objects. The harness’s own switches (`contextManager`, `builtinTools`) are JSON values, but a custom `Offload` pipeline with tuned numbers needs a [tunable factory](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/tunables/index.md#tune-context-strategies).
+-   **No subagent prompts.** Subagents are module references, so their prompts aren’t in the file.
+-   **One skills folder.** `--tune skills` works only when `skills` is a single local folder.
+-   **The config needs an `instructions` field**, even an empty one, unless you pass `--no-tune-instructions`.
+-   **Built-in tools act on this machine.** `shell`, `write`, and `edit` run as configured, and concurrent trials share the working directory. Set a sandbox in the config or turn those tools off.
+-   **Resume refuses a changed config.** A killed run whose config file changed since it started can’t be resumed, because its trials would mix two agents.
+
+## An exported agent file
+
+When you build an agent in the strands CLI and run `/export`, it writes a project whose agent file builds the agent with one `create_harness(...)``createHarness(...)` call. Point `--agent` at that file. The call’s arguments are the baseline, and `--tune` takes the same forms as for a config file, with paths naming the call’s arguments:
+
+(( tab "Python" ))
+agent.py
+
+```python
+from strands_harness import create_harness
+
+agent = create_harness(
+    name="support",
+    instructions="You are a friendly support agent. Chat with the customer.",
+    model="bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0",
+    context_manager="auto",
+)
+```
+
+```bash
+strands-evals optimize run experiment.json --agent agent.py \
+  --tune 'context_manager=["auto", "agentic"]' \
+  --tune 'effort=["auto", "low"]'
+```
+(( /tab "Python" ))
+
+(( tab "TypeScript" ))
+agent.ts
+
+```typescript
+import { createHarness } from '@strands-agents/harness'
+
+export const agent = await createHarness({
+  name: 'support',
+  instructions: 'You are a friendly support agent. Chat with the customer.',
+  model: 'bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0',
+  contextManager: 'auto',
+})
+```
+
+```bash
+strands-evals optimize run experiment.json --agent agent.ts \
+  --tune 'contextManager=["auto", "agentic"]' \
+  --tune 'effort=["auto", "low"]'
+```
+
+The optimizer itself is Python, so the command still runs from `strands-evals`. It starts a Node.js worker for the agent file and sends it each trial. The worker returns the agent’s output and its traces, so token counts and trace-level evaluators work as they do for a Python agent. You need Node.js 22.18 or later, with `@strands-agents/harness` installed next to the file.
+(( /tab "TypeScript" ))
+
+The file runs again for every trial with the candidate’s values, so every trial gets a fresh agent. An argument the call leaves out takes the harness’s default and is passed only when a candidate changes it. Candidates that can’t be built are caught before they cost a rollout.
+
+**Limitations:**
+
+-   **Only `create_harness``createHarness` is captured.** A plain Strands `Agent` built directly isn’t, because its settings live in other constructors. Write a tunable factory for that.
+-   **JSON values only.** Like a config file: no components, no model objects, so no temperature. Lists and objects work, so tool sets can be a choice. `model` is a string here, so it can be a choice.
+-   **The harness’s own subagents only.** Their prompts aren’t arguments of the call.
+-   **CLI only.** The Python `Optimizer` still takes a tunable factory.
+-   **Option values aren’t checked before the run**, unlike a config file’s. A value the harness rejects shows up as an invalid candidate.
+-   **TypeScript:** a custom rollout gets a stand-in for the agent. Its invoke method asks a fresh agent once; for a multi-turn conversation, open its session and call `turn` once per message, and the same agent answers every turn. Nothing else on the agent is reachable.
+
+## Save a command as a run file
+
+Once a command gets long, keep it in a `.toml` run file and pass the file where the experiment file would go. Each key is a flag name without the leading `--`, with `-` written as `_`:
+
+runs/triage.toml
+
+```toml
+experiment = "../experiment.json"
+max_rollouts = 120
+name = "triage"  # prefix of the run folder's name
+
+[agent]
+factory = "../agent.py:create_agent"
+
+[objective.triage]
+maximize = "Triage"
+
+[objective.tokens]
+minimize = "output_tokens"
+scale = 100
+
+[constraint.latency]
+metric = "seconds"
+at_most = 30
+```
+
+```bash
+strands-evals optimize run runs/triage.toml
+```
+
+The `[agent]` table holds the route:
+
+| Route | `[agent]` keys |
+| --- | --- |
+| A tunable factory | `factory = "agent.py:create_agent"` |
+| Your own task function | `build_task = "tasks.py:build_task"` and `space = "tasks.py:space"` |
+| A config file | `config = "agent.json"`, and `tune = [...]` with one `--tune` value per entry |
+| An exported agent file | `factory = "agent.py"` (or `"agent.ts"`), and `tune = [...]` |
+
+Paths in the file (`experiment`, `config`, and file paths in `MODULE:ATTR` values) resolve against the file’s own folder, so the run works from any directory. Each objective and constraint is a named table; the name is only a label.
+
+A flag given on the command line wins over the file, so `strands-evals optimize run runs/triage.toml --max-rollouts 300` reruns with a bigger budget. An unknown key fails before the run starts, and suggests a valid key when one is close.
+
+## What every route shares
+
+-   **Resume trusts your code.** Resuming re-imports the agent code, rollout, and environment without comparing them, so don’t change them between a kill and a resume.
+-   **The test split is the unseen-case check.** The search and the pick never read it. Before shipping, also rerun your experiment on a few cases the run never had.
+
+## Next steps
+
+-   [Declaring what can change](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/tunables/index.md): Every marker, for the factory and task routes
+-   [Objectives, constraints, and budget](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/objectives/index.md): The same settings on every route
+-   [Reading the results](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/results/index.md): The run folder and resuming from the CLI
+
+Source: http://github.programdotrun.com/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/entry_routes/index.md
+
+---
+
+## Objectives, constraints, and budget
+
+The optimizer picks whatever scores best on the objective you give it, within the constraints you set and the budget you allow. This page covers how to say what “better” means, how to rule candidates out, and how much a run costs.
+
+## Metrics you can optimize
+
+A metric is either an evaluator from your experiment or a usage number measured from the agent’s traces.
+
+-   **Evaluators**, by name with or without the `Evaluator` suffix: `"Helpfulness"` and `"HelpfulnessEvaluator"` are the same metric. An evaluator’s range is its `score_range` attribute, or 0 to 1 when it has none.
+-   **Usage**: `tokens`, `input_tokens`, `output_tokens`, `cache_read_tokens`, `cache_write_tokens`, `model_calls`, and `seconds`. With a factory, these count the agent it built and every agent under it; with a task function, every model call in the trial. They never count the judges.
+
+An unknown name fails when you build the optimizer, before any rollout.
+
+## Choose an objective
+
+Without an objective, the optimizer maximizes the mean of your evaluators, the same number a plain evaluation run reports. To aim at one metric, use `Maximize` or `Minimize`:
+
+```python
+from strands_evals.optimization import Maximize
+
+objective = Maximize("Helpfulness")
+```
+
+To trade two things off, combine them in a `WeightedSum`:
+
+```python
+from strands_evals.optimization import Maximize, Minimize, WeightedSum
+
+objective = WeightedSum(
+    Maximize("Helpfulness", weight=2),
+    Minimize("tokens", scale=1000),
+)
+```
+
+`scale` is the size of a meaningful change, and `weight` is how much that change counts. Here Helpfulness has weight 2, so its whole range counts twice as much as 1,000 tokens. An evaluator’s scale defaults to its range, so you only set it for usage metrics, which have no upper bound.
+
+When you can’t name an exchange rate between quality and cost, use `Pareto` with the same terms. The optimizer still picks one champion, but it validates and tests up to five members of the front of trade-offs (or `n_finalists`, if larger) so you can pick another from `result.front`:
+
+```python
+from strands_evals.optimization import Maximize, Minimize, Pareto
+
+objective = Pareto(Maximize("Helpfulness"), Minimize("tokens", scale=1000))
+```
+
+## Rule candidates out with constraints
+
+A constraint is a line the champion must not cross:
+
+```python
+from strands_evals.optimization import AtLeast, AtMost
+
+constraints = [
+    AtMost("seconds", 30),
+    AtLeast("Correctness", 0.8),
+]
+```
+
+During the search, constraints only rank: candidates likely to meet every constraint come first, and the others become parents only when none is likely to meet them. At the end, only a candidate that meets every constraint on validation can be the champion, and “meets” means the model puts the chance of meeting it at 90% or more. When no candidate qualifies, your current agent stays the champion.
+
+Prefer a constraint over a cost term when you have a hard limit. A weighted cost term buys quality with tokens at a fixed rate; a constraint says “never above this”.
+
+## Set the budget
+
+The budget is counted in **rollouts**: one case run once by the agent. A run stops when its budget is spent, and every such stop still runs the end phase, because the end phase’s share is held back from the start. A run that stops on an error or an interrupt skips the end phase and can be resumed.
+
+```python
+from strands_evals.optimization import Budget
+
+budget = Budget(max_rollouts=300, max_iterations=20)
+```
+
+The default is 500 rollouts and no iteration cap.
+
+### How many rollouts a run needs
+
+A run spends its budget in four parts. The two reserves are held back before the search starts, so the search can never spend them:
+
+```text
+baseline            num_train_cases x num_runs
+each search step    num_proposals x num_train_cases x num_runs
+validation reserve  (num_finalists + 1) x (num_validation_cases x num_runs + headroom)
+test reserve        2 x (num_test_cases x num_runs + headroom)
+
+headroom            num_rerun_passes x (5% x num_split_cases x num_runs, rounded up)
+```
+
+`num_runs` is the `Optimizer`’s `runs_per_candidate`, `num_proposals` its `proposals_per_iteration`, `num_finalists` its `FinalPick(n_finalists=...)`, and `num_rerun_passes` its `rerun_passes`. `num_split_cases` is the validation or test cases, for the reserve the headroom belongs to.
+
+The headroom is extra room, for each candidate scored in the end phase, to run a trial again when it fails on an outage. With 6 validation cases and 1 run, 5% is 0.3, which rounds up to 1, so the 2 default re-run passes add 2 rollouts per candidate. Under a `Pareto` objective, both reserves cover at least 5 finalists plus the baseline, because every member of the front is validated and tested.
+
+The quickstart’s run works out like this, with 20 cases split 8 / 6 / 6 and the defaults (4 proposals, up to 3 finalists, 1 run per candidate, 2 re-run passes):
+
+| Part | Rollouts |
+| --- | --- |
+| Baseline | 8 |
+| Each search step | 4 x 8 = 32 |
+| Validation reserve | 4 x (6 + 2) = 32 |
+| Test reserve | 2 x (6 + 2) = 16 |
+
+The minimum budget is the baseline plus both reserves, 56 here, and a smaller budget fails at construction with that number. The minimum leaves nothing for the search, so a budget below 56 + 32 = 88 warns that it can’t pay for one step. With `max_rollouts=120`, the search gets the other 64, which pays for two steps. The run then spent 108 of its 120 rollouts: it needed no re-runs, so the headroom went unused.
+
+The budget counts the agent’s rollouts only. These model calls aren’t counted against it, and the result reports each one’s tokens (see [What the run cost](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/results/index.md#what-the-run-cost)):
+
+-   **Judges**: every LLM evaluator call. On short answers, judges often use more tokens than the agent.
+-   **Proposers**: the text rewriter’s own model calls, which can exceed the agent’s and the judges’ spend together.
+-   **Other agents**: agents in the rollout that your factory didn’t build, such as a simulated user.
+
+A retried attempt’s tokens count in the role that spent them. Retries inside a model call (throttling, timeouts, server errors) are free. A trial that fails on an outage or expired credentials is run again by the optimizer, and each re-run costs a rollout.
+
+## Other settings that change the pick
+
+| Setting | `Optimizer` argument | CLI flag | Default | Change it when |
+| --- | --- | --- | --- | --- |
+| Split | `split=Split(train=0.5, validation=0.25, test=0.25)` | `--split 0.5,0.25,0.25` | 40% train, 30% validation, 30% test | You need specific cases in a split, or more in the search |
+| Runs per candidate | `runs_per_candidate=3` | `--runs-per-candidate 3` | 1 | Your agent is noisy and each case needs repeats |
+| Proposals per step | `proposals_per_iteration=2` | `--proposals-per-iteration 2` | 4 | You want wider or narrower steps |
+| Agent failure score | `agent_failure_score=None` | `--agent-failure-score none` | `"worst"` | A crash should count as missing data, not as the worst score |
+| Final pick rule | `final_pick=FinalPick(rule=LowerBound(q=0.1))` | `--final-pick MODULE:ATTR` | `Mean()` | You’d rather pick cautiously, ranking by the pessimistic end |
+
+`Split`, `FinalPick`, and `LowerBound` import from `strands_evals.optimization`.
+
+A crashed rollout scores each evaluator’s worst value by default, so a candidate that crashes can’t look good by skipping its hard cases. Throttling, outages, and expired credentials are never scored: those trials are run again.
+
+## Set them from the command line
+
+Every setting has a flag on `strands-evals optimize run`:
+
+```bash
+strands-evals optimize run experiment.json --agent agent.py:create_agent \
+  --objective maximize:Helpfulness:weight=2 \
+  --objective minimize:tokens:scale=1000 \
+  --constraint 'seconds<=30' \
+  --max-rollouts 300 \
+  --split 0.5,0.25,0.25
+```
+
+Several `--objective` flags make a weighted sum; add `--pareto` for a front. Run `strands-evals optimize run --help` for every flag.
+
+To keep a long command in a file, see [Save a command as a run file](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/entry_routes/index.md#save-a-command-as-a-run-file).
+
+## Next steps
+
+-   [Reading the results](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/results/index.md): See what the objective picked and how sure the run is
+-   [Declaring what can change](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/tunables/index.md): Widen or narrow what the search may touch
+
+## Related pages
+
+- [Context Injector](/harness-sdk/pr-cms-48/docs/user-guide/sdk/plugins/context-injector/index.md) (1 shared tag)
+- [GenAI Prices Estimator](/harness-sdk/pr-cms-48/docs/user-guide/sdk/plugins/genai-prices-estimator/index.md) (1 shared tag)
+- [Todos](/harness-sdk/pr-cms-48/docs/user-guide/sdk/plugins/todos/index.md) (1 shared tag)
+- [Built-in Modes](/harness-sdk/pr-cms-48/docs/user-guide/sdk/context-management/built-in-modes/index.md) (1 shared tag)
+- [Context Estimation](/harness-sdk/pr-cms-48/docs/user-guide/sdk/context-management/context-estimation/index.md) (1 shared tag)
+- [Context management](/harness-sdk/pr-cms-48/docs/user-guide/sdk/context-management/index.md) (1 shared tag)
+- [Custom Strategies](/harness-sdk/pr-cms-48/docs/user-guide/sdk/context-management/custom-strategies/index.md) (1 shared tag)
+- [Strategy Presets](/harness-sdk/pr-cms-48/docs/user-guide/sdk/context-management/presets/index.md) (1 shared tag)
+- [Declaring what can change](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/tunables/index.md) (1 shared tag)
+- [Skills](/harness-sdk/pr-cms-48/docs/user-guide/sdk/plugins/skills/index.md) (1 shared tag)
+
+Source: http://github.programdotrun.com/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/objectives/index.md
+
+---
+
+## Optimization quickstart
+
+This guide optimizes a support-ticket triage agent end to end. The agent reads a customer ticket and should answer with one line naming its category and priority. Its starting prompt doesn’t say that, so it starts out writing friendly paragraphs instead. You’ll let the optimizer rewrite the prompt and tune the temperature, then read what won and why. The run takes about ten minutes, on a budget of 120 rollouts.
+
+## Install the SDK
+
+The optimizer ships with the evals SDK behind the `optimization` extra, which adds numpy, scipy, Optuna, and the Strands harness:
+
+```bash
+pip install 'strands-agents-evals[optimization]'
+```
+
+Importing `strands_evals.optimization` without the extra raises an `ImportError` that names this command.
+
+The agent, the judge, and the default text rewriter all call Claude on Amazon Bedrock. Configure AWS credentials with permission to invoke them: see the [evals quickstart](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/quickstart/index.md#configure-credentials). Refresh short-lived credentials before a long run. Trials that fail on expired credentials are retried, never scored, but they keep spending rollouts.
+
+### Optional: install the agent skills
+
+The evals SDK ships agent skills, including `optimize`, that let your coding assistant set up and run an optimization for you. This guide does the same steps by hand, so you can follow it either way.
+
+**Using a coding agent?** Copy this prompt into Codex, Claude Code, Kiro, or any coding assistant and it will install strands-agents-evals and set up its skills in that assistant.
+
+Copy prompt
+
+To install them yourself instead, run this from the environment where you installed the package:
+
+```bash
+npx skills add "$(python -c 'import strands_evals, pathlib; print(pathlib.Path(strands_evals.__file__).parent / ".agents" / "skills")')" --copy
+```
+
+See [Install the skills](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/index.md#install-the-skills) for the options.
+
+## Write the experiment
+
+The optimizer judges every configuration with an ordinary [experiment](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/how-evaluation-works/index.md#what-an-evaluation-is-made-of): its cases are the work the agent should do well, and its evaluators score how well it did. If you already evaluate your agent, reuse that experiment. This guide builds a new one: twenty tickets, each with the label it should get, and a rubric judge that scores the agent’s line against that label.
+
+```python
+from strands_evals import Case, Experiment
+from strands_evals.evaluators import OutputEvaluator
+
+TICKETS = [
+    (
+        "I was charged twice for order #4821, please refund the duplicate.",
+        "billing",
+        "high",
+    ),
+    (
+        "My card was charged $250 but the order was cancelled yesterday.",
+        "billing",
+        "high",
+    ),
+    (
+        "Can I get an invoice with my company's tax ID for last month's order?",
+        "billing",
+        "normal",
+    ),
+    ("My discount code SAVE10 didn't apply at checkout.", "billing", "normal"),
+    ("Do you accept PayPal?", "billing", "low"),
+    ("My package was marked delivered a week ago but never arrived.", "shipping", "high"),
+    (
+        "Can I change the delivery address on order #5520? It hasn't shipped yet.",
+        "shipping",
+        "normal",
+    ),
+    ("Tracking for order #6013 hasn't updated in five days.", "shipping", "normal"),
+    ("Do you ship to Canada?", "shipping", "low"),
+    ("How long does standard shipping usually take?", "shipping", "low"),
+    ("The blender arrived cracked and leaking.", "returns", "high"),
+    (
+        "I returned my laptop three weeks ago and still haven't been refunded.",
+        "returns",
+        "high",
+    ),
+    ("The jacket I got is the wrong size. How do I exchange it?", "returns", "normal"),
+    ("I want to return two unopened books from order #7710.", "returns", "normal"),
+    ("What's your return policy for sale items?", "returns", "low"),
+    ("Someone changed my account email and I can't log in.", "account", "high"),
+    ("I see orders on my account that I didn't place.", "account", "high"),
+    ("The password reset email never arrives.", "account", "normal"),
+    ("How do I change the name shown on my profile?", "account", "low"),
+    ("Can I turn off marketing emails?", "account", "low"),
+]
+
+triage_judge = OutputEvaluator(
+    name="Triage",
+    rubric=(
+        "The response must be exactly one line: 'category: "
+        "<billing|shipping|returns|account>, priority: <high|normal|low>'. Priority is "
+        "high when the customer lost money, got a damaged item, or has an account "
+        "security problem; low for a general question that needs no action; normal "
+        "otherwise. Score 1.0 if the line matches the expected output, 0.5 if only the "
+        "category matches or the format is off, and 0.0 otherwise."
+    ),
+)
+
+experiment = Experiment(
+    cases=[
+        Case(
+            name=f"ticket-{i:02d}",
+            input=ticket,
+            expected_output=f"category: {category}, priority: {priority}",
+        )
+        for i, (ticket, category, priority) in enumerate(TICKETS)
+    ],
+    evaluators=[triage_judge],
+)
+```
+
+Every case needs a unique name, because candidates are compared case by case. Twenty cases split into 8 for the search, 6 for picking the winner, and 6 for the final test.
+
+To reuse the experiment from the command line, or to rerun the same cases later, save it to a file:
+
+```python
+experiment.to_file("experiment.json")
+```
+
+To browse and edit its cases in the browser, run [`strands-evals ui`](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/cli/ui/index.md) in the folder that holds the file.
+
+## Declare what may change
+
+Write the agent as a factory function and mark the parameters the optimizer may change. The parameter defaults are the **baseline**: the agent you have today.
+
+```python
+from strands import Agent
+from strands.models import BedrockModel
+from strands_evals.optimization import Float, TextValue, tunable
+
+
+@tunable(system_prompt=TextValue(), temperature=Float(0.0, 1.0))
+def create_agent(system_prompt="You are a helpful support assistant.", temperature=0.9):
+    return Agent(
+        model=BedrockModel(
+            model_id="us.anthropic.claude-haiku-4-5-20251001-v1:0",
+            temperature=temperature,
+        ),
+        system_prompt=system_prompt,
+        callback_handler=None,
+    )
+```
+
+The optimizer rewrites the system prompt with a model (Claude Sonnet 5.5 on Amazon Bedrock by default) that reads the agent’s own conversations and the judge’s reasons, and searches the temperature alongside it. The rewriter works in a temporary folder through a confined shell that isn’t a sandbox, so run it on a machine without production credentials.
+
+`@tunable` doesn’t change how the function behaves when you call it: `create_agent()` still returns the baseline agent. During a run, the optimizer builds a fresh agent for every trial through this same function, so no state leaks between trials.
+
+## Say what “better” means
+
+Without an objective, the optimizer maximizes the mean of your evaluators. Here the goal is the right label in as few words as possible:
+
+```python
+from strands_evals.optimization import Budget, Maximize, Minimize, Optimizer, WeightedSum
+
+optimizer = Optimizer(
+    experiment,
+    create_agent,
+    objective=WeightedSum(Maximize("Triage"), Minimize("output_tokens", scale=100)),
+    budget=Budget(max_rollouts=120),
+)
+```
+
+`scale=100` means a change of 100 output tokens weighs as much as the whole 0 to 1 Triage range. Token counts come from the agent’s traces, so you don’t measure anything yourself. A rollout is one case run once; the default budget is 500.
+
+## Run it
+
+```python
+result = optimizer.run()
+print(result.summary())
+```
+
+`run()` writes everything to a run folder under `optimization/runs/` in the working directory and returns the result when the run ends. To watch the run fill in as it goes, run `strands-evals ui .` from that directory. Use `await optimizer.run_async()` inside an event loop.
+
+```text
+# Example output (abridged):
+Optimization result: 20261123-200351-8245db
+===================================================================================
+Objective:    WeightedSum(Maximize(Triage), Minimize(output_tokens, scale=100))
+Stop reason:  budget                  Rollouts:   108 / 120
+Iterations:   2                       Pick rule:  Mean
+Champion:     candidate 6             Outcome:    top_finalist
+Parent:       candidate 4
+Proposers:    text (Reflection), numbers (TPE)
+Changed:      system_prompt, temperature
+===================================================================================
+Validation     id            objective  goal           estimate     sd  measured  n
+-----------------------------------------------------------------------------------
+baseline       e8f41ba9c90b     -0.909  Triage            0.056  0.069     0.000  6
+                                        output_tokens     187.4    9.5     192.8  6
+candidate 5    f1436f1cdb76      0.289  Triage            0.672  0.068     0.667  6
+                                        output_tokens       9.4    7.9      10.0  6
+candidate 4    50e6d7c2701e      0.268  Triage            0.655  0.065     0.667  6
+                                        output_tokens      11.9    7.3      10.0  6
+candidate 6 *  7153e597806d      0.332  Triage            0.793  0.071     0.833  6
+                                        output_tokens      12.9    7.8      10.0  6
+===================================================================================
+Test vs baseline  baseline  champion    diff            90% CI  n
+-----------------------------------------------------------------------------------
+objective           -0.998     0.325  +1.323  [+1.133, +1.512]  6
+Triage               0.083     0.750  +0.667  [+0.454, +0.879]  6
+output_tokens        207.8      10.0  -197.8  [-234.9, -160.8]  6
+===================================================================================
+Changed      baseline  champion
+-----------------------------------------------------------------------------------
+temperature  0.9       0.500304
+===================================================================================
+Tokens             search  validation    test    total  failed
+-----------------------------------------------------------------------------------
+agent              22,577       7,735   3,685   33,997       0
+judges            192,516      62,808  31,952  287,276       0
+proposer text     426,851           0       0  426,851       0
+proposer numbers        0           0       0        0       0
+other agents            0           0       0        0       -
+total             641,944      70,543  35,637  748,124       -
+```
+
+## Read what won
+
+The summary answers three questions:
+
+-   **What won.** The header names the champion, candidate 6, and the outcome `top_finalist`: a finalist beat your current agent on validation. In the validation table (marked `*`), the baseline scored about 0 on Triage because it answered every ticket with a paragraph. The champion scores 0.79 and writes about 13 tokens instead of 187.
+-   **Whether it holds up.** Yes. On the six test cases, which neither the search nor the pick ever read, Triage went from 0.08 to 0.75 and output tokens from 208 to 10, both with intervals far from zero.
+-   **What to change.** The header’s `Changed` line lists the system prompt and the temperature. Numbers and choices are in the `Changed` table; text changes are in the diff.
+
+The effects file tells you which of those changes did the work:
+
+```python
+for row in result.effects["effects"]:
+    low, high = row["ci90"]
+    print(f'{row["metric"]}: {row["key"]}={row["level"]} vs {row["reference"]}: '
+          f'{row["mean"]:+.3g} [{low:+.3g}, {high:+.3g}]')
+```
+
+```text
+# Example output (abridged):
+Triage: rewritten:text=rewritten vs default: +0.743 [+0.641, +0.846]
+Triage: temperature=(0.308522, 0.594614] vs (0.594614, 0.975872]: +0.00917 [-0.0531, +0.0715]
+output_tokens: rewritten:text=rewritten vs default: -213 [-224, -202]
+```
+
+The rewritten prompt did all of it: +0.74 Triage and 213 fewer tokens. Temperature made no difference, so the champion’s `0.50` is where the search happened to be, not a finding: keep your current value. See [Reading the results](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/results/index.md#which-options-mattered) for the full effects table.
+
+## Apply the result
+
+Nothing in your code changed. The run folder holds what you need to apply by hand:
+
+-   `best.diff`: a unified diff of every changed text value, here the system prompt
+-   `best.values.json`: every changed number and choice, with its old and new value
+
+The rewritten prompt, from `best.diff` (abridged):
+
+```diff
+--- system_prompt
++++ system_prompt
+@@ -1 +1,20 @@
+-You are a helpful support assistant.
++You are a support-ticket triage classifier. You do NOT answer, advise, or ask questions.
++Whatever the customer message says (question, complaint, request), your only job is to
++classify it.
++
++Output exactly one line, nothing else:
++category: <category>, priority: <priority>
++
++category (pick one, lowercase):
++- billing: charges, duplicate charges, invoices, tax IDs, payment methods, pricing
++- returns: returning items, return policy, damaged or defective items, exchanges
++- account: login, password, profile settings, unauthorized access or orders
++- shipping: delivery status, lost or late packages, tracking, address
++- technical: product or app malfunction, bugs, how-to for product use
++- other: anything that fits none of the above
++
++priority (pick one, lowercase):
++- high: money lost or at risk, security or unauthorized activity, damaged goods
++- normal: routine requests needing action but not urgent
++- low: general questions, policy info, cosmetic or minor settings changes
+```
+
+Review the rewrite before you copy it in. This one added two categories, `technical` and `other`, that none of the tickets use. They’re harmless here, but you might drop them, or keep them if your real tickets need somewhere to go. Then rerun your experiment on a few fresh tickets to confirm.
+
+## Full example
+
+```python
+from strands import Agent
+from strands.models import BedrockModel
+from strands_evals import Case, Experiment
+from strands_evals.evaluators import OutputEvaluator
+from strands_evals.optimization import (
+    Budget,
+    Float,
+    Maximize,
+    Minimize,
+    Optimizer,
+    TextValue,
+    WeightedSum,
+    tunable,
+)
+
+TICKETS = [
+    (
+        "I was charged twice for order #4821, please refund the duplicate.",
+        "billing",
+        "high",
+    ),
+    (
+        "My card was charged $250 but the order was cancelled yesterday.",
+        "billing",
+        "high",
+    ),
+    (
+        "Can I get an invoice with my company's tax ID for last month's order?",
+        "billing",
+        "normal",
+    ),
+    ("My discount code SAVE10 didn't apply at checkout.", "billing", "normal"),
+    ("Do you accept PayPal?", "billing", "low"),
+    ("My package was marked delivered a week ago but never arrived.", "shipping", "high"),
+    (
+        "Can I change the delivery address on order #5520? It hasn't shipped yet.",
+        "shipping",
+        "normal",
+    ),
+    ("Tracking for order #6013 hasn't updated in five days.", "shipping", "normal"),
+    ("Do you ship to Canada?", "shipping", "low"),
+    ("How long does standard shipping usually take?", "shipping", "low"),
+    ("The blender arrived cracked and leaking.", "returns", "high"),
+    (
+        "I returned my laptop three weeks ago and still haven't been refunded.",
+        "returns",
+        "high",
+    ),
+    ("The jacket I got is the wrong size. How do I exchange it?", "returns", "normal"),
+    ("I want to return two unopened books from order #7710.", "returns", "normal"),
+    ("What's your return policy for sale items?", "returns", "low"),
+    ("Someone changed my account email and I can't log in.", "account", "high"),
+    ("I see orders on my account that I didn't place.", "account", "high"),
+    ("The password reset email never arrives.", "account", "normal"),
+    ("How do I change the name shown on my profile?", "account", "low"),
+    ("Can I turn off marketing emails?", "account", "low"),
+]
+
+triage_judge = OutputEvaluator(
+    name="Triage",
+    rubric=(
+        "The response must be exactly one line: 'category: "
+        "<billing|shipping|returns|account>, priority: <high|normal|low>'. Priority is "
+        "high when the customer lost money, got a damaged item, or has an account "
+        "security problem; low for a general question that needs no action; normal "
+        "otherwise. Score 1.0 if the line matches the expected output, 0.5 if only the "
+        "category matches or the format is off, and 0.0 otherwise."
+    ),
+)
+
+experiment = Experiment(
+    cases=[
+        Case(
+            name=f"ticket-{i:02d}",
+            input=ticket,
+            expected_output=f"category: {category}, priority: {priority}",
+        )
+        for i, (ticket, category, priority) in enumerate(TICKETS)
+    ],
+    evaluators=[triage_judge],
+)
+
+
+@tunable(system_prompt=TextValue(), temperature=Float(0.0, 1.0))
+def create_agent(system_prompt="You are a helpful support assistant.", temperature=0.9):
+    return Agent(
+        model=BedrockModel(
+            model_id="us.anthropic.claude-haiku-4-5-20251001-v1:0",
+            temperature=temperature,
+        ),
+        system_prompt=system_prompt,
+        callback_handler=None,
+    )
+
+
+if __name__ == "__main__":
+    optimizer = Optimizer(
+        experiment,
+        create_agent,
+        objective=WeightedSum(Maximize("Triage"), Minimize("output_tokens", scale=100)),
+        budget=Budget(max_rollouts=120),
+    )
+    result = optimizer.run()
+    print(result.summary())
+```
+
+The same run from a shell, with this file saved as `agent.py` and the experiment saved by `experiment.to_file("experiment.json")`. The `__main__` guard keeps the CLI from starting a second run when it imports the file:
+
+```bash
+strands-evals optimize run experiment.json --agent agent.py:create_agent \
+  --objective maximize:Triage --objective minimize:output_tokens:scale=100 \
+  --max-rollouts 120
+```
+
+## Next steps
+
+-   [Declaring what can change](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/tunables/index.md): Rewrite prompts, swap components, tune context strategies
+-   [Objectives, constraints, and budget](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/objectives/index.md): Add constraints and size the budget
+-   [Reading the results](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/results/index.md): The effects table, the test report, and resuming
+
+## Related pages
+
+- [Choosing an Agent Foundation](/harness-sdk/pr-cms-48/docs/user-guide/migrate/choosing-an-agent-foundation/index.md) (1 shared tag)
+- [Get started](/harness-sdk/pr-cms-48/docs/user-guide/sdk/quickstart/overview/index.md) (1 shared tag)
+- [Python Quickstart](/harness-sdk/pr-cms-48/docs/user-guide/sdk/quickstart/python/index.md) (1 shared tag)
+- [Strands evaluation quickstart](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/quickstart/index.md) (1 shared tag)
+- [Strands Shell quickstart](/harness-sdk/pr-cms-48/docs/user-guide/shell/quickstart/index.md) (1 shared tag)
+- [TypeScript Quickstart](/harness-sdk/pr-cms-48/docs/user-guide/sdk/quickstart/typescript/index.md) (1 shared tag)
+- [Use Strands with AI coding agents](/harness-sdk/pr-cms-48/docs/user-guide/build-with-ai/index.md) (1 shared tag)
+- [Red teaming quickstart](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/red-teaming/quickstart/index.md) (1 shared tag)
+- [Build a Voice Agent](/harness-sdk/pr-cms-48/docs/user-guide/sdk/bidi/quickstart/index.md) (1 shared tag)
+- [Decision models quickstart](/harness-sdk/pr-cms-48/docs/user-guide/sdk/decision-models/quickstart/index.md) (1 shared tag)
+
+Source: http://github.programdotrun.com/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/quickstart/index.md
+
+---
+
+## Reading the results
+
+An optimization run ends with a **champion**: the configuration the optimizer picked for you to review and apply. This page covers how to read why it won, how sure the run is, which options mattered, and how to apply it. It also covers resuming a run that was stopped partway.
+
+## Start with the summary
+
+`result.summary()` is the overview. From the CLI, `strands-evals optimize run` prints the same summary when the run finishes in a terminal. When its output is piped, as in CI, it prints the whole result as JSON instead; `--json` asks for that anywhere.
+
+```python
+result = optimizer.run()
+print(result.summary())
+```
+
+The summary is a stack of tables, read top to bottom. A table with nothing to show is left out:
+
+| Section | Answers |
+| --- | --- |
+| Header | What ran and what won: the objective, why the search stopped, rollouts spent against the budget, the champion, and the outcome |
+| Validation | How the baseline and each finalist scored on cases the search never saw: the estimate, its sd, and the measured mean per metric, with P(met) for each constraint |
+| Not feasible | Each finalist that can’t ship, and why |
+| Test vs baseline | Whether the win holds on cases nothing else read: both means, the difference, and its 90% interval |
+| Front test vs baseline | Under `Pareto`, the same test comparison for each front member |
+| Changed | The champion’s new numbers and choices, next to the baseline’s, when it beat the baseline |
+| Tokens | What the run spent, by role and split: the agent, the judges, each proposer, and other agents, with each role’s failed attempts |
+
+Notes at the end define each column. The [quickstart](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/quickstart/index.md#run-it) shows a full summary from a real run.
+
+In the validation table, `measured` is the mean over the cases that have a value for that metric, and `n` is how many there are. It’s usually every validation case, but a case isn’t counted when its evaluator returned not applicable or raised, when every trial failed on infrastructure, or when the agent crashed and `agent_failure_score` gives the metric no value (always with `None`). So `n` can differ between metrics. When only one case has a value, `n` counts its runs instead.
+
+The header’s **outcome** says how the pick ended:
+
+| Outcome | Means |
+| --- | --- |
+| `top_finalist` | A finalist beat your current agent and is the champion |
+| `baseline_best` | Your current agent ranked first among the feasible candidates and stays the champion |
+| `no_feasible_finalist` | No finalist met every constraint, so your current agent stays the champion |
+| `no_finalists` | The search produced nothing to validate, so your current agent stays the champion |
+
+Your current agent winning is a real answer: it’s as good as anything the search found within the budget. `result.validation.outcome` holds the same value.
+
+## Browse a run in the browser
+
+To look through a run without writing code, serve your project folder with [`strands-evals ui`](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/cli/ui/index.md):
+
+```bash
+strands-evals ui .
+```
+
+It finds the runs under `optimization/runs/` along with your experiments. Each run gets a view with its result, its setup, the progress of every step, each candidate’s diff against the baseline, and the trade-off front. The page refreshes while a run is in progress.
+
+## What changed
+
+The champion’s changes come in two parts, because text and settings are applied differently:
+
+```python
+champion = result.best
+print(champion.diff())             # changed text, as a unified diff
+print(champion.changed_values())   # numbers and choices: {key: {"old": ..., "new": ...}}
+champion.values                    # every value of the champion, changed or not
+```
+
+Text from a file marker appears in the diff on its real file path; text from your code appears as a hunk headed by its key. `result.improved` is `False` when the champion is your current agent.
+
+## Apply the champion
+
+The run folder holds both parts: `best.diff` for the text and `best.values.json` for the numbers and choices. Review them, then edit the values into your code or config. To get the same files for another candidate, such as a runner-up from the summary, look it up by id and call `write_diff`:
+
+```python
+runner_up = result.candidate("f1436f1cdb76")
+runner_up.write_diff("runner_up.diff")  # writes runner_up.diff and runner_up.values.json
+```
+
+Before you ship, rerun your experiment on a few cases the optimizer never saw. Repeated runs against the same cases can slowly fit them.
+
+## How sure the run is
+
+The **test report** compares the champion with your current agent on test cases that neither the search nor the pick ever read. For each metric your objective and constraints use, it gives both sides’ means over the same cases, the paired difference with a 90% interval, and a ratio for metrics that can’t go negative. `report.objective` holds the same paired comparison for the objective itself:
+
+```python
+def show(value):
+    return "n/a" if value is None else f"{value:+.3g}"
+
+
+report = result.test
+if report is None:
+    print(result.test_reason)
+else:
+    for metric, diff in report.difference.items():
+        print(
+            f"{metric}: {show(diff.reference_mean)} -> {show(diff.candidate_mean)}, "
+            f"{diff.mean_diff:+.3g} [{show(diff.ci_low)}, {show(diff.ci_high)}] "
+            f"over {diff.n_cases} cases"
+        )
+```
+
+The interval is `None` when only one test case was measured by both, and the means are `None` in a report saved by an older version.
+
+Read the interval, not the point. An interval that excludes zero is a change the test cases support. One that includes zero means the test cases can’t tell, often because there are few of them. The report never changes which candidate is the champion.
+
+`result.validation` shows how the champion was picked: every finalist’s estimate on validation, the pick rule, each constraint’s P(met), and why any finalist was ruled out.
+
+## Which options mattered
+
+The champion’s values include settings that happened to be where the search left them. The effects table separates those from the options that actually moved a metric. Each row is one option against its reference, per metric, with a 90% interval. Text values share one row per proposer block, `rewritten:<block>`:
+
+```python
+for row in result.effects["effects"]:
+    low, high = row["ci90"]
+    print(f'{row["metric"]}: {row["key"]}={row["level"]} vs {row["reference"]}: '
+          f'{row["mean"]:+.3g} [{low:+.3g}, {high:+.3g}]')
+```
+
+From the [quickstart](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/quickstart/index.md) run:
+
+| Option | Triage | Output tokens |
+| --- | --- | --- |
+| system prompt rewritten vs the original | +0.74 \[+0.64, +0.85\] | \-213 \[-224, -202\] |
+| temperature 0.31 to 0.59 vs above 0.59 | +0.009 \[-0.053, +0.072\] | \-1.7 \[-9.1, +5.7\] |
+| temperature 0.31 or lower vs above 0.59 | +0.011 \[-0.050, +0.072\] | \-2.5 \[-11, +5.8\] |
+
+The rewritten prompt did all the work; temperature did nothing measurable. That’s worth more than the champion’s exact values: it tells you to keep the rewrite, leave the temperature where it was, and stop spending budget on it.
+
+## What the run cost
+
+The budget counts rollouts. The model usage behind them, and everything the budget doesn’t count, is in the summary’s Tokens table and in `result.cost`, by role and split (train is the search; validation and test are the end phase):
+
+```python
+cost = result.cost
+print(cost.total.tokens)                       # every model call in the run
+print(cost.agent["train"].usage.tokens)        # the agent during the search
+print(cost.judges["validation"].usage.tokens)  # the judges in the end phase
+for block, spend in cost.proposers.items():    # each proposer, by search block
+    print(block, spend.usage.tokens, spend.failed)
+```
+
+| Role | Holds |
+| --- | --- |
+| `cost.agent[split]` | The agent’s usage over every attempt, with `trials`, `attempts`, and `failed`. `attempts - trials` is how many times the agent ran again |
+| `cost.judges[split]` | The evaluators’ usage, with `failed`: attempts where an evaluator failed |
+| `cost.proposers[block]` | Each proposer’s own model calls, with `failed`: its retried and failed requests |
+| `cost.benchmark[split]` | Agents in the rollout that your factory didn’t build, such as a simulated user |
+| `cost.total` | All of the above |
+
+Every attempt counts once, in the role that spent it. A retried attempt’s tokens are part of its role’s figure, so there’s no separate retry total.
+
+## Dig into the run
+
+For anything the summary doesn’t show, the result gives you rows and full reports:
+
+```python
+import pandas as pd  # pip install pandas
+
+proposals = pd.DataFrame(result.to_rows("proposal"))  # one row per candidate
+cases = pd.DataFrame(result.to_rows("case"))          # one row per trial
+result.reports[result.best.id]["test"].display()  # an EvaluationReport per split
+```
+
+`to_rows` also takes `"iteration"`, one row per search step.
+
+The reports carry no trajectories. Each report row, and each case row, instead names its trial’s conversation under `transcript`. Load it with `load_transcript`, which reads it from the run folder:
+
+```python
+row = result.reports[result.best.id]["test"].cases[0]
+# a Session, or the list the rollout returned
+session = result.load_transcript(row["transcript"])
+```
+
+Pass `run_dir=` when the run folder has moved. To browse conversations instead, open the run in [`strands-evals ui`](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/cli/ui/index.md).
+
+## What’s in the run folder
+
+Every run writes to its own folder, by default under `optimization/runs/` in the working directory, named for the run’s start time. Add `optimization/runs/` to your `.gitignore`; to put runs somewhere else, pass `base_dir=` to the `Optimizer`, or `--base-dir` on the command line. `result.run_dir` gives its path, and the CLI prints it as soon as the run starts.
+
+| File | Holds |
+| --- | --- |
+| `best.diff`, `best.values.json` | The champion’s changes, for you to review and apply |
+| `result.json` | The whole result, every candidate’s reports included |
+| `effects.json` | What each option did to each metric |
+| `run.json` | The run’s settings: the declared space, objective, constraints, and versions |
+| `events.jsonl` | The append-only log of everything the run did; resume replays it |
+| `transcripts/` | Each trial’s conversation, stored once |
+| `candidates/` | Each candidate’s copy of the files it edits, when it edits files |
+| `front/` | Each front member’s diff and values (`Pareto` runs only) |
+| `cli.json` | The CLI’s inputs, so `resume` needs only the folder (CLI runs only) |
+| `run.lock` | An empty file locked while a process writes the run, so two can’t write it at once |
+
+`result.json` is the file to keep. Load it later, in a notebook or another process, without the optimizer or the agent:
+
+```python
+from strands_evals.optimization import OptimizationResult
+
+result = OptimizationResult.from_file(
+    "optimization/runs/20261123-200351-8245db/result.json"
+)
+print(result.summary())
+```
+
+`events.jsonl` is the optimizer’s own record, read by resume. Its format isn’t a public API, so read the run through `result.json` and `to_rows` rather than parsing the log.
+
+## Resume a stopped run
+
+Every trial is saved the moment it finishes, so a run that was killed, interrupted, or stopped on an error picks up where it left off without paying for finished work again:
+
+```python
+from strands_evals.optimization import Maximize, Minimize, Optimizer, WeightedSum
+
+optimizer = Optimizer.resume(
+    "optimization/runs/20261123-200351-8245db",
+    experiment=experiment,
+    factory=create_agent,
+    objective=WeightedSum(Maximize("Triage"), Minimize("output_tokens", scale=100)),
+)
+result = optimizer.run()
+```
+
+Pass the same experiment, factory, objective, constraints, and search the run started with.
+
+From the CLI, resume needs only the run folder, because the CLI saved its inputs there:
+
+```bash
+strands-evals optimize resume optimization/runs/20261123-200351-8245db
+```
+
+A killed run may resume with a larger `--max-rollouts`. A finished run only prints its saved result again; to search more, start a new run.
+
+Resume checks the cases, the declared space, the objective, the constraints, and the search against the saved run, and refuses on a mismatch. It doesn’t check your agent code, so leave it unchanged between a kill and a resume. The resumed run replays the same splits, parents, and proposals. The step that was cut off reuses the proposals it had already drawn, even the text rewriter’s, so the candidates it scored come back with their trials. A step killed before it drew anything asks its proposers again.
+
+When a proposer fails in a way retrying can’t fix (a wrong model id, no model access), the search halts before the end phase and raises `ProposerError`, so no validation or test rollouts are spent on a dead search. The CLI exits with code 3 and prints the resume command. Fix the cause and resume.
+
+## Next steps
+
+-   [Declaring what can change](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/tunables/index.md): Narrow the next run to the options that mattered
+-   [Objectives, constraints, and budget](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/objectives/index.md): Add the constraint the champion should have respected
+
+Source: http://github.programdotrun.com/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/results/index.md
+
+---
+
+## Customizing the search
+
+The search is the part of an optimization run that proposes new configurations. Each **proposer** owns some of your tunable values and suggests new ones for them; the optimizer scores what they propose and tells them how it went. The defaults work for most runs. This page is for when you want a different proposer for a value, or a different model rewriting your text.
+
+## What the search does by default
+
+With no search given, every tunable value goes to a proposer by its kind:
+
+| Values | Proposer | How it proposes |
+| --- | --- | --- |
+| Text: prompts, files, skills, tool descriptions | `Reflection` | A model (Claude Sonnet 5.5 on Amazon Bedrock) reads the agent’s own conversations, the judge’s reasons, and every earlier version with its scores, then rewrites the text |
+| A `choice()` between components | `TPE` | Bayesian optimization over the alternatives |
+| Numbers and `OneOf` options | `TPE` | Bayesian optimization, learned separately under each alternative |
+
+When the space has a `choice()`, the search works in rounds: each round tries an alternative, then tunes the rest of the values inside it.
+
+## Use Thompson sampling for choices
+
+`Thompson` is an alternative proposer for choices (a `choice()` between components, or a `OneOf`). Instead of a separate search model, it samples each option’s effect from the optimizer’s own fit of everything measured so far, and proposes the untried option that looks best in that sample. Once every option is measured, the draw picks which one the search keeps refining, so it suits a few alternatives you want compared fairly, such as two models. It’s never the default: give it a block.
+
+```python
+from strands import Agent
+from strands.models import BedrockModel
+from strands_evals.optimization import (
+    Block,
+    Float,
+    Search,
+    TextValue,
+    Thompson,
+    choice,
+    component,
+    tunable,
+)
+
+
+@tunable(
+    system_prompt=TextValue(),
+    model=choice(
+        haiku=component(
+            BedrockModel,
+            model_id="us.anthropic.claude-haiku-4-5-20251001-v1:0",
+            temperature=Float(0.0, 1.0, default=0.3),
+        ),
+        sonnet=component(
+            BedrockModel,
+            model_id="us.anthropic.claude-sonnet-4-5-20250929-v1:0",
+            temperature=Float(0.0, 1.0, default=0.3),
+        ),
+    ),
+)
+def create_agent(system_prompt="You are a support agent for Acme Shop.", model=None):
+    return Agent(model=model, system_prompt=system_prompt, callback_handler=None)
+
+
+search = Search([Block(Thompson(), "model")])
+```
+
+Pass it as `Optimizer(experiment, create_agent, search=search)`. Only the values a block names change hands: here Thompson picks the model, and each model’s temperature and the system prompt keep their default proposers.
+
+With a combined objective (a weighted sum or a Pareto front), Thompson weighs the goals at random on each sample, so successive proposals aim at different trade-offs. Pass `random_weights=False` to aim every sample at the weights you declared.
+
+## Change the text rewriter’s model
+
+The default rewriter calls Claude Sonnet 5.5 on Amazon Bedrock. To use another model, give the text values a block of their own with a configured `Reflection`:
+
+```python
+from strands.models import BedrockModel
+from strands_evals.optimization import Block, Reflection, Search
+
+rewriter = Reflection(
+    model=BedrockModel(model_id="us.anthropic.claude-sonnet-4-5-20250929-v1:0")
+)
+search = Search([Block(rewriter, "system_prompt")])
+```
+
+From the command line, `--reflection-model MODEL_ID` does the same for every text value.
+
+The rewriter works through a shell confined to a temporary folder. That shell isn’t a sandbox: it can reach the network and anything the user running the optimizer can read. Run it on a machine or container without credentials it doesn’t need.
+
+## Set the search from the command line
+
+Every route takes `--search MODULE:ATTR`, naming a `Search` in your own module:
+
+```bash
+strands-evals optimize run experiment.json --agent agent.py:create_agent \
+  --search tuning.py:search
+```
+
+`--search` and `--reflection-model` can’t be combined; set the model on the `Reflection` in your `Search` instead.
+
+## Next steps
+
+-   [Declaring what can change](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/tunables/index.md): The values a block can name
+-   [Objectives, constraints, and budget](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/objectives/index.md): The goals Thompson samples against
+-   [Reading the results](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/results/index.md): See which proposer produced the champion
+
+Source: http://github.programdotrun.com/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/search/index.md
+
+---
+
+## Declaring what can change
+
+Before the optimizer can search, you tell it what it’s allowed to change. You do that by writing the agent as a factory function and attaching a **marker** to each parameter that may vary. Everything without a marker is passed through unchanged. This page covers every marker and then the patterns that combine them: context strategies, component swaps, and multi-agent systems.
+
+All examples need `pip install 'strands-agents-evals[optimization]'`.
+
+## Mark a factory’s parameters
+
+Decorate the factory with `@tunable` and pass one marker per tunable parameter. The parameter defaults are the baseline:
+
+```python
+from strands import Agent
+from strands.models import BedrockModel
+from strands_evals.optimization import Float, TextValue, tunable
+
+
+@tunable(system_prompt=TextValue(), temperature=Float(0.0, 1.0))
+def create_agent(
+    system_prompt="You are a support agent for Acme Shop.", temperature=0.3
+):
+    return Agent(
+        system_prompt=system_prompt,
+        model=BedrockModel(temperature=temperature),
+        callback_handler=None,
+    )
+
+
+agent = create_agent()  # the baseline, with no optimizer involved
+```
+
+Calling the decorated function builds the baseline agent, so production code can keep using it. If you’d rather not import the optimizer in production code at all, leave the factory undecorated and mount it from your eval script instead:
+
+```python
+from strands_evals.optimization import Float, TextValue, tunable
+
+from my_app.agents import create_agent  # a plain, undecorated factory
+
+tunable_agent = tunable(
+    create_agent,
+    inject={"system_prompt": TextValue(), "temperature": Float(0.0, 1.0)},
+)
+```
+
+Mistakes fail at declaration, before any rollout: a marker naming no parameter, a component whose constructor rejects its own defaults, or two markers on the same text (one file declared twice, or the same JSON field).
+
+Declarations are flat: the optimizer tunes only the markers on the factory you pass it. Stacking a second `@tunable` on the same function fails at declaration. A marker declared only on a tunable factory called from inside another one is never tuned: it isn’t in the optimizer’s space, so it stays at its baseline with no error.
+
+## The markers
+
+| Marker | Declares | Default proposer |
+| --- | --- | --- |
+| `TextValue()` | A text value, such as a system prompt | Text rewriter |
+| `FileText(path)` | Text whose source of truth is a file | Text rewriter |
+| `JsonField(path, pointer)` | One field of a JSON file, addressed by JSON pointer | Text rewriter for text, TPE for numbers, booleans, and a `OneOf` |
+| `SkillLibrary(path)` | Each skill’s `SKILL.md` in a skills folder | Text rewriter |
+| `tool_descriptions(*tools)` | Each tool’s description | Text rewriter |
+| `Int(min, max)` / `Float(min, max)` | A number, inclusive bounds | TPE |
+| `OneOf(*options)` | One of several plain values | TPE |
+| `JsonChoice(*options)` | One of several JSON values, lists and objects included | TPE |
+| `choice(...)` of `component(...)` | A swap between constructed objects, each with its own tuned arguments | TPE |
+
+Each marker’s baseline, the value the search starts from, comes from one place:
+
+-   **`Int`, `Float`, `TextValue`**: `default=` if you pass it, else the parameter’s default. Leave `default=` off when the parameter has one, so you write the baseline once.
+-   **`OneOf`, `JsonChoice`**: `default=` if you pass it, else the parameter’s default, which must be one of the options. With neither, the **first option** is the baseline.
+-   **`choice()`**: always the **first alternative**. A default on the parameter is ignored, even when you call the factory yourself, so list the alternative you run today first.
+-   **File markers** (`FileText`, `JsonField`, `SkillLibrary`): the file’s current text.
+
+## Text values
+
+A plain `TextValue` holds text that lives in your code. Text that lives in files gets a file marker, so the diff the optimizer returns lands on the real file:
+
+```python
+from strands import Agent
+from strands_evals.optimization import FileText, JsonField, tunable
+
+
+@tunable(
+    system_prompt=FileText("prompts/support.md"),
+    greeting=JsonField("config/agent.json", "/greeting"),
+)
+def create_agent(system_prompt: str, greeting: str):
+    return Agent(system_prompt=f"{system_prompt}\n\n{greeting}", callback_handler=None)
+```
+
+The file’s current text is the baseline, so to change where the search starts, edit the file: a default on the parameter is ignored. Your files are never written: the parameter receives the candidate’s text. If the agent needs a path rather than the text, pass `as_path=True` to `FileText`: each candidate gets its own copy of the folder around the file, and the parameter receives the path of that copy.
+
+A `JsonField` can also hold a number or a boolean, and the parameter then receives a typed value rather than text. Give a number the `Int` or `Float` to search it with; a boolean needs nothing. To search a field among set values instead, give it a `OneOf`:
+
+```python
+from strands import Agent
+from strands.models import BedrockModel
+from strands_evals.optimization import Float, JsonField, OneOf, tunable
+
+MODELS = {
+    "haiku": "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+    "sonnet": "us.anthropic.claude-sonnet-4-5-20250929-v1:0",
+}
+
+
+@tunable(
+    temperature=JsonField("config/agent.json", "/temperature", Float(0.0, 1.0)),
+    streaming=JsonField("config/agent.json", "/streaming"),
+    model=JsonField("config/agent.json", "/model", OneOf("haiku", "sonnet")),
+)
+def create_agent(temperature: float, streaming: bool, model: str):
+    return Agent(
+        model=BedrockModel(
+            model_id=MODELS[model], temperature=temperature, streaming=streaming
+        ),
+        callback_handler=None,
+    )
+```
+
+The file’s value is the baseline, so these markers take no `default=`, and an integer field takes an `Int` the same way. A number without a marker fails at declaration. Typed fields are searched with the numbers and choices, not by the text rewriter, and a change shows in its file’s diff and in `best.values.json`.
+
+A `JsonField` takes a `OneOf`, never a `JsonChoice`, and an array or object field takes no marker at all: it stays a text value holding its JSON text, which the text rewriter edits. To choose among lists, such as tool sets, declare a [`JsonChoice`](#choose-a-tool-set) on the factory, or use `--tune` on a config file.
+
+Two settings guard every text marker:
+
+-   **`size_cap`**: the longest text a proposal may be, in characters. It defaults to the larger of 2,000 and three times the baseline’s length (800 and three times its length for a tool description), and stops prompt bloat before it costs a rollout.
+-   **`edit_instructions`**: guidance shown to the text rewriter next to this value, such as “keep the refund policy section unchanged”.
+
+## Skills
+
+To let the optimizer edit your agent’s skills, point `SkillLibrary` at the skills folder. Each skill’s `SKILL.md` becomes a tunable text, and the parameter receives the path of the candidate’s copy:
+
+```python
+from strands import Agent
+from strands.vended_plugins.skills import AgentSkills
+from strands_evals.optimization import SkillLibrary, tunable
+
+
+@tunable(skills=SkillLibrary("skills", only=("returns", "shipping")))
+def create_agent(skills="skills"):
+    return Agent(plugins=[AgentSkills(skills=str(skills))], callback_handler=None)
+```
+
+`only=` limits editing to the named skills; the others are copied unedited. Scripts and reference files next to a `SKILL.md` are copied but never edited, and a proposal must keep the skill’s frontmatter `name`.
+
+## Tool descriptions
+
+A tool’s description is often the most influential text in an agent: the model reads it on every call. `tool_descriptions` makes each tool’s description tunable, and the parameter receives fresh copies of the tools with the candidate’s descriptions:
+
+```python
+from strands import Agent, tool
+from strands_evals.optimization import tool_descriptions, tunable
+
+
+@tool
+def lookup_order(order_id: str) -> str:
+    """Look up an order by its id."""
+    return f"Order {order_id}: shipped on Monday"
+
+
+@tunable(tools=tool_descriptions(lookup_order))
+def create_agent(tools=(lookup_order,)):
+    return Agent(tools=list(tools), callback_handler=None)
+```
+
+Your tool objects are never modified, so concurrent trials can’t leak descriptions into each other. MCP tools can’t be declared this way: their specs can’t be set on a copy.
+
+## Choose a tool set
+
+Sometimes the question isn’t how to describe a tool but whether the agent should have it at all: extra tools cost tokens on every call and give the model more ways to go wrong. To search over which tools the agent gets, make each option a list with `JsonChoice`:
+
+```python
+from strands import Agent, tool
+from strands_evals.optimization import JsonChoice, tunable
+
+
+@tool
+def lookup_order(order_id: str) -> str:
+    """Look up an order by its id."""
+    return f"Order {order_id}: shipped on Monday"
+
+
+@tool
+def issue_refund(order_id: str) -> str:
+    """Refund an order in full."""
+    return f"Order {order_id}: refunded"
+
+
+TOOLS = {"lookup_order": lookup_order, "issue_refund": issue_refund}
+
+
+@tunable(tool_names=JsonChoice([], ["lookup_order"], ["lookup_order", "issue_refund"]))
+def create_agent(tool_names=("lookup_order",)):
+    return Agent(tools=[TOOLS[name] for name in tool_names], callback_handler=None)
+```
+
+The factory receives the chosen list itself. `JsonChoice` takes any JSON value as an option (strings, numbers, lists, objects, or a mix), so the same marker fits any setting whose value is a structure.
+
+Each option is one whole set, not a subset search: the optimizer picks among exactly the lists you write, so list the combinations worth comparing. Options are stored as canonical JSON text, which is what you’ll see in the run’s summary and `best.values.json`. List order matters: `["lookup_order", "issue_refund"]` and `["issue_refund", "lookup_order"]` are different options, so write the baseline’s list in the same order as its option. A `JsonChoice` can’t be an argument of a `component()`; declare it on the factory itself.
+
+## Choose which skills load
+
+The same idea works for skills, and it combines with rewriting them. `SkillLibrary` makes each skill’s `SKILL.md` tunable, its frontmatter description included, and a `JsonChoice` picks which of those skills the agent loads:
+
+```python
+from pathlib import Path
+
+from strands import Agent
+from strands.vended_plugins.skills import AgentSkills
+from strands_evals.optimization import JsonChoice, SkillLibrary, tunable
+
+
+@tunable(
+    skills=SkillLibrary("skills"),
+    enabled=JsonChoice(
+        ["returns"], ["returns", "shipping"], ["returns", "shipping", "billing"]
+    ),
+)
+def create_agent(skills="skills", enabled=("returns", "shipping", "billing")):
+    folders = [str(Path(skills) / name) for name in enabled]
+    return Agent(plugins=[AgentSkills(skills=folders)], callback_handler=None)
+```
+
+`skills` is the candidate’s copy of the folder, so the chosen skills load with the candidate’s rewrites. The baseline loads all three, as written today. A rewrite to a skill the candidate doesn’t load has no effect but still costs the rewriter’s calls, so when only some skills are worth rewriting, name them with `SkillLibrary(..., only=...)`.
+
+## Swap components
+
+To compare constructed objects, use `choice()` with one `component()` per alternative. Each component’s `Int`, `Float`, and `OneOf` arguments are tuned under that alternative only. Here two models each get their own temperature range, so the search learns a good temperature per model instead of one compromise for both:
+
+```python
+from strands import Agent
+from strands.models import BedrockModel
+from strands_evals.optimization import Float, choice, component, tunable
+
+
+@tunable(
+    model=choice(
+        haiku=component(
+            BedrockModel,
+            model_id="us.anthropic.claude-haiku-4-5-20251001-v1:0",
+            temperature=Float(0.0, 1.0, default=0.3),
+        ),
+        sonnet=component(
+            BedrockModel,
+            model_id="us.anthropic.claude-sonnet-4-5-20250929-v1:0",
+            temperature=Float(0.0, 0.7, default=0.3),
+        ),
+    )
+)
+def create_agent(model=None):
+    return Agent(model=model, callback_handler=None)
+```
+
+The first alternative is the baseline, and it replaces the parameter’s default. Every trial builds a fresh component through its real constructor, so hooks register and no state carries over.
+
+When the only difference is the model id, a `OneOf` of ids is enough. Either way, pair a model choice with a cost term or a constraint. An objective that only rewards quality picks the larger model whenever it is no worse, because nothing tells it the larger model costs more. See [Objectives, constraints, and budget](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/objectives/index.md).
+
+An alternative can also be a fixed value, given by keyword. That’s how you make something optional: `choice(on=component(...), off=None)`.
+
+## Tune context strategies
+
+Context management is a good fit for optimization: the right summarization point and the number of recent messages to keep depend on your workload, and nobody guesses them well. An `Offload` strategy takes its conditions through `.when(...)`, and the agent takes a whole configuration, so write a small function whose parameters are the numbers to tune, and give it to `component()`:
+
+```python
+from strands import Agent
+from strands.context_manager import Offload
+from strands_evals.optimization import Int, choice, component, tunable
+
+
+def offload_config(summarize_at=85, keep_recent=4, tool_result_tokens=2000):
+    return {
+        "strategies": [
+            Offload.truncate("tool_results", {"preview_tokens": 500}).when(
+                block_threshold=tool_result_tokens
+            ),
+            Offload.summarize("*").when(
+                context_utilization=f"{summarize_at}%", preserve_recent=keep_recent
+            ),
+        ],
+    }
+
+
+@tunable(
+    context_manager=choice(
+        auto="auto",
+        presets={"strategies": ["large_tool_offloading", "proactive_summarization"]},
+        custom=component(
+            offload_config,
+            summarize_at=Int(50, 95),
+            keep_recent=Int(2, 20),
+            tool_result_tokens=Int(500, 8000),
+        ),
+    )
+)
+def create_agent(context_manager="auto"):
+    return Agent(context_manager=context_manager, callback_handler=None)
+```
+
+This declares three alternatives: the built-in `"auto"` mode (the baseline), a fixed pair of presets, and a custom pipeline with three tuned numbers. The custom numbers are searched only when the custom pipeline is chosen, and the search learns them separately from the other alternatives. `offload_config` runs again for every agent, so no strategy object is shared between trials.
+
+To compare only the built-in modes, a plain `OneOf("auto", "agentic", False)` is enough.
+
+See [Custom strategies](/harness-sdk/pr-cms-48/docs/user-guide/sdk/context-management/custom-strategies/index.md) for every `Offload` target and condition.
+
+## Tune a multi-agent system
+
+One factory builds every agent in the system, and each agent’s prompt carries its own marker. Keep the declaration flat: put every marker on the one tunable factory, and write the agents it builds as plain functions that take those values as parameters. Here an orchestrator calls a billing specialist as a tool:
+
+```python
+from strands import Agent
+from strands_evals.optimization import TextValue, tunable
+
+
+def billing_agent(billing_prompt):  # a plain builder: no @tunable here
+    return Agent(
+        name="billing",
+        description="Answers billing questions.",
+        system_prompt=billing_prompt,
+        callback_handler=None,
+    )
+
+
+@tunable(orchestrator_prompt=TextValue(), billing_prompt=TextValue())
+def create_agent(
+    orchestrator_prompt="Route each customer question to the right specialist.",
+    billing_prompt="You resolve billing questions: charges, refunds, and invoices.",
+):
+    return Agent(
+        system_prompt=orchestrator_prompt,
+        tools=[billing_agent(billing_prompt)],
+        callback_handler=None,
+    )
+```
+
+Declare `billing_prompt` on `create_agent`, not on `billing_agent`. A marker only the inner builder declares never reaches the optimizer, so the specialist would run its baseline prompt in every trial with no error to tell you.
+
+If the builders live in production code you’d rather not touch, leave them undecorated and mount the outer factory from your eval script, with every marker in one call:
+
+```python
+from strands_evals.optimization import TextValue, tunable
+
+from my_app.agents import create_support_agent  # builds both agents
+
+tunable_agent = tunable(
+    create_support_agent,
+    inject={"orchestrator_prompt": TextValue(), "billing_prompt": TextValue()},
+)
+```
+
+Token and latency metrics count the agent the factory returns and every agent running under it, so the specialist’s spend is part of the candidate’s cost.
+
+## Pass fixed objects safely
+
+A fixed (non-marker) argument to `component()`, and a fixed alternative in `choice()`, is deep-copied for every build so concurrent trials never share it. An object that can’t be copied, such as an `Agent` or a `BedrockModel`, fails at declaration. Build it inside the function you pass to `component()` instead: that function is never copied, so anything it creates is fresh, and anything it refers to is shared on purpose.
+
+## What the optimizer sees
+
+Your declaration becomes a flat mapping of dotted keys, the **candidate**. For the context example above, a custom-pipeline candidate looks like this:
+
+```python
+{
+    "context_manager": "custom",
+    "context_manager.custom.summarize_at": 85,
+    "context_manager.custom.keep_recent": 4,
+    "context_manager.custom.tool_result_tokens": 2000,
+}
+```
+
+These keys are the names you’ll see in the run’s summary and `best.values.json`, and for numbers and choices in the effects table too. Keys under an alternative exist only when that alternative is chosen. Text values are the exception in the effects table: each block’s text values share one row, `rewritten:<block>`, so with the default search every prompt in the space is one row, `rewritten:text`.
+
+## Next steps
+
+-   [Choosing an entry route](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/entry_routes/index.md): Declare the same space without a Python factory
+-   [Objectives, constraints, and budget](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/objectives/index.md): Say what “better” means
+-   [Reading the results](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/results/index.md): See which of these options actually mattered
+
+## Related pages
+
+- [Skills](/harness-sdk/pr-cms-48/docs/user-guide/sdk/plugins/skills/index.md) (2 shared tags)
+- [Context Injector](/harness-sdk/pr-cms-48/docs/user-guide/sdk/plugins/context-injector/index.md) (1 shared tag)
+- [GenAI Prices Estimator](/harness-sdk/pr-cms-48/docs/user-guide/sdk/plugins/genai-prices-estimator/index.md) (1 shared tag)
+- [Objectives, constraints, and budget](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/objectives/index.md) (1 shared tag)
+- [Todos](/harness-sdk/pr-cms-48/docs/user-guide/sdk/plugins/todos/index.md) (1 shared tag)
+- [Instruction following evaluator](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/evaluators/instruction_following_evaluator/index.md) (1 shared tag)
+- [Built-in Modes](/harness-sdk/pr-cms-48/docs/user-guide/sdk/context-management/built-in-modes/index.md) (1 shared tag)
+- [Context Estimation](/harness-sdk/pr-cms-48/docs/user-guide/sdk/context-management/context-estimation/index.md) (1 shared tag)
+- [Context management](/harness-sdk/pr-cms-48/docs/user-guide/sdk/context-management/index.md) (1 shared tag)
+- [Custom Strategies](/harness-sdk/pr-cms-48/docs/user-guide/sdk/context-management/custom-strategies/index.md) (1 shared tag)
+
+Source: http://github.programdotrun.com/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/tunables/index.md
+
+---
+
 ## Strands evaluation quickstart
 
 Strands Evaluation measures an agent’s quality before you ship it and after. This quickstart takes you to a first running evaluation: install the SDK, write one experiment, score an agent’s output with a built-in evaluator, and read the results. From there, the [next steps](#next-steps) cover trajectory and helpfulness scoring, the CLI, custom evaluators, and automated test generation.
@@ -31195,6 +32923,7 @@ You have a running evaluation. From here, a natural path forward:
 
 - [Choosing an Agent Foundation](/harness-sdk/pr-cms-48/docs/user-guide/migrate/choosing-an-agent-foundation/index.md) (1 shared tag)
 - [Get started](/harness-sdk/pr-cms-48/docs/user-guide/sdk/quickstart/overview/index.md) (1 shared tag)
+- [Optimization quickstart](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/quickstart/index.md) (1 shared tag)
 - [Python Quickstart](/harness-sdk/pr-cms-48/docs/user-guide/sdk/quickstart/python/index.md) (1 shared tag)
 - [Strands Shell quickstart](/harness-sdk/pr-cms-48/docs/user-guide/shell/quickstart/index.md) (1 shared tag)
 - [TypeScript Quickstart](/harness-sdk/pr-cms-48/docs/user-guide/sdk/quickstart/typescript/index.md) (1 shared tag)
@@ -31954,6 +33683,7 @@ report.display()
 
 - [Choosing an Agent Foundation](/harness-sdk/pr-cms-48/docs/user-guide/migrate/choosing-an-agent-foundation/index.md) (1 shared tag)
 - [Get started](/harness-sdk/pr-cms-48/docs/user-guide/sdk/quickstart/overview/index.md) (1 shared tag)
+- [Optimization quickstart](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/quickstart/index.md) (1 shared tag)
 - [Python Quickstart](/harness-sdk/pr-cms-48/docs/user-guide/sdk/quickstart/python/index.md) (1 shared tag)
 - [Strands evaluation quickstart](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/quickstart/index.md) (1 shared tag)
 - [Strands Shell quickstart](/harness-sdk/pr-cms-48/docs/user-guide/shell/quickstart/index.md) (1 shared tag)
@@ -31961,7 +33691,6 @@ report.display()
 - [Use Strands with AI coding agents](/harness-sdk/pr-cms-48/docs/user-guide/build-with-ai/index.md) (1 shared tag)
 - [Attack strategies](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/red-teaming/strategies/index.md) (1 shared tag)
 - [Harmfulness evaluator](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/evaluators/harmfulness_evaluator/index.md) (1 shared tag)
-- [Reading the report](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/red-teaming/reading_the_report/index.md) (1 shared tag)
 
 Source: http://github.programdotrun.com/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/red-teaming/quickstart/index.md
 
@@ -33876,7 +35605,7 @@ Source: http://github.programdotrun.com/harness-sdk/pr-cms-48/docs/user-guide/ev
 
 ## Get one running
 
-You do not have to pass anything. Import it, instantiate it, then give the agent a task:
+You do not have to pass anything. Agents get shell, file tools, and web access out of the box. Import it, instantiate it, then give the agent a task:
 
 (( tab "Python" ))
 ```python
@@ -35939,9 +37668,9 @@ Four of Strands harness’s default tools let the agent work with a machine: `sh
 
 ## The shell tool
 
-`shell` runs a command line through the Strands Harness SDK’s stateless, sandbox-routed shell. Each call runs in a fresh shell: there is no persisted working directory or environment between calls, so a command that needs a directory or a variable set must set it in the same call. The tool takes the `command` to run and an optional `timeout`.
+`shell` runs a command line through the Strands Harness SDK’s sandbox-routed shell. Each call runs in a fresh shell: there is no persisted working directory or environment between calls, so a command that needs a directory or a variable set must set it in the same call. The tool takes the `command` to run and an optional `timeout`.
 
-Because it is stateless, the agent chains steps within one command (`cd build && cmake ..`) rather than relying on state carrying over. This is a deliberate design: a fresh shell per call is predictable and safe to route through a sandbox.
+The agent chains steps within one command (`cd build && cmake ..`) rather than relying on state carrying over. This is a deliberate design: a fresh shell per call is predictable and safe to route through a sandbox.
 
 ## The file tools
 
@@ -35953,9 +37682,13 @@ The three file tools are thin wrappers over the agent’s sandbox:
 
 All three take absolute paths and reject path traversal (a `..` segment), so a tool call cannot walk outside the intended location by relative path.
 
-## Everything routes through the sandbox
+## Everything routes through the sandbox interface
 
-Both the shell and the file tools reach the filesystem through the same [sandbox](/harness-sdk/pr-cms-48/docs/user-guide/sdk/sandbox/index.md) seam. The default is a local sandbox on the host, but the same tools work unchanged against a Docker or SSH sandbox, so the platform, working directory, and files the agent sees describe where it actually runs. To isolate what the agent can touch, run it under a [sandbox](/harness-sdk/pr-cms-48/docs/user-guide/sdk/sandbox/index.md) rather than trying to restrict the tools themselves.
+The default is not a sandbox
+
+Omitting the `sandbox` parameter when creating agents runs the agent’s command and file tools directly on the host with the full permissions of the agent process. Treat this as convenience for trusted, local development only. For untrusted input or production runs, pass an explicit sandbox.
+
+Both the shell and the file tools reach the filesystem through the same [sandbox](/harness-sdk/pr-cms-48/docs/user-guide/sdk/sandbox/index.md) seam. The implementation of the sandbox interface that is used by default is a pass-through to the local host that *does not provide any security guardrails*, but the same tools work unchanged against a Docker or SSH sandbox, so the platform, working directory, and files the agent sees describe where it actually runs. To isolate what the agent can touch, run it under a [sandbox](/harness-sdk/pr-cms-48/docs/user-guide/sdk/sandbox/index.md) rather than trying to restrict the tools themselves.
 
 ## Select or disable them
 
@@ -36301,6 +38034,7 @@ Choose the migration path that matches your current foundation. For a new agent,
 ## Related pages
 
 - [Get started](/harness-sdk/pr-cms-48/docs/user-guide/sdk/quickstart/overview/index.md) (1 shared tag)
+- [Optimization quickstart](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/quickstart/index.md) (1 shared tag)
 - [Python Quickstart](/harness-sdk/pr-cms-48/docs/user-guide/sdk/quickstart/python/index.md) (1 shared tag)
 - [Strands evaluation quickstart](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/quickstart/index.md) (1 shared tag)
 - [Strands Shell quickstart](/harness-sdk/pr-cms-48/docs/user-guide/shell/quickstart/index.md) (1 shared tag)
@@ -48897,6 +50631,7 @@ model = OpenAIRealtimeModel(
 
 - [Choosing an Agent Foundation](/harness-sdk/pr-cms-48/docs/user-guide/migrate/choosing-an-agent-foundation/index.md) (1 shared tag)
 - [Get started](/harness-sdk/pr-cms-48/docs/user-guide/sdk/quickstart/overview/index.md) (1 shared tag)
+- [Optimization quickstart](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/quickstart/index.md) (1 shared tag)
 - [Python Quickstart](/harness-sdk/pr-cms-48/docs/user-guide/sdk/quickstart/python/index.md) (1 shared tag)
 - [Strands evaluation quickstart](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/quickstart/index.md) (1 shared tag)
 - [Strands Shell quickstart](/harness-sdk/pr-cms-48/docs/user-guide/shell/quickstart/index.md) (1 shared tag)
@@ -48904,7 +50639,6 @@ model = OpenAIRealtimeModel(
 - [Use Strands with AI coding agents](/harness-sdk/pr-cms-48/docs/user-guide/build-with-ai/index.md) (1 shared tag)
 - [BidiAgent](/harness-sdk/pr-cms-48/docs/user-guide/sdk/bidi/agent/index.md) (1 shared tag)
 - [Bidirectional Streaming](/harness-sdk/pr-cms-48/docs/user-guide/sdk/bidi/index.md) (1 shared tag)
-- [Bidirectional Streaming Models](/harness-sdk/pr-cms-48/docs/user-guide/sdk/bidi/models/index.md) (1 shared tag)
 
 
 ## Implementation
@@ -49323,8 +51057,8 @@ Sessions saved before the rename still resume, and keep resuming after the depre
 - [Conversation Management](/harness-sdk/pr-cms-48/docs/user-guide/sdk/agents/conversation-management/index.md) (2 shared tags)
 - [Context Injector](/harness-sdk/pr-cms-48/docs/user-guide/sdk/plugins/context-injector/index.md) (1 shared tag)
 - [GenAI Prices Estimator](/harness-sdk/pr-cms-48/docs/user-guide/sdk/plugins/genai-prices-estimator/index.md) (1 shared tag)
+- [Objectives, constraints, and budget](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/objectives/index.md) (1 shared tag)
 - [Todos](/harness-sdk/pr-cms-48/docs/user-guide/sdk/plugins/todos/index.md) (1 shared tag)
-- [Coherence evaluator](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/evaluators/coherence_evaluator/index.md) (1 shared tag)
 
 
 ## Implementation
@@ -49471,8 +51205,8 @@ The agent runs without any context reduction. Overflow errors propagate directly
 - [Conversation Management](/harness-sdk/pr-cms-48/docs/user-guide/sdk/agents/conversation-management/index.md) (2 shared tags)
 - [Context Injector](/harness-sdk/pr-cms-48/docs/user-guide/sdk/plugins/context-injector/index.md) (1 shared tag)
 - [GenAI Prices Estimator](/harness-sdk/pr-cms-48/docs/user-guide/sdk/plugins/genai-prices-estimator/index.md) (1 shared tag)
+- [Objectives, constraints, and budget](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/objectives/index.md) (1 shared tag)
 - [Todos](/harness-sdk/pr-cms-48/docs/user-guide/sdk/plugins/todos/index.md) (1 shared tag)
-- [Coherence evaluator](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/evaluators/coherence_evaluator/index.md) (1 shared tag)
 
 
 ## Implementation
@@ -49574,8 +51308,8 @@ Both the built-in [context management modes](/harness-sdk/pr-cms-48/docs/user-gu
 - [Conversation Management](/harness-sdk/pr-cms-48/docs/user-guide/sdk/agents/conversation-management/index.md) (2 shared tags)
 - [Context Injector](/harness-sdk/pr-cms-48/docs/user-guide/sdk/plugins/context-injector/index.md) (1 shared tag)
 - [GenAI Prices Estimator](/harness-sdk/pr-cms-48/docs/user-guide/sdk/plugins/genai-prices-estimator/index.md) (1 shared tag)
+- [Objectives, constraints, and budget](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/objectives/index.md) (1 shared tag)
 - [Todos](/harness-sdk/pr-cms-48/docs/user-guide/sdk/plugins/todos/index.md) (1 shared tag)
-- [Coherence evaluator](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/evaluators/coherence_evaluator/index.md) (1 shared tag)
 
 
 ## Implementation
@@ -49965,8 +51699,8 @@ A message-level summary runs client-side, which drops thinking, when either mode
 - [Conversation Management](/harness-sdk/pr-cms-48/docs/user-guide/sdk/agents/conversation-management/index.md) (2 shared tags)
 - [Context Injector](/harness-sdk/pr-cms-48/docs/user-guide/sdk/plugins/context-injector/index.md) (1 shared tag)
 - [GenAI Prices Estimator](/harness-sdk/pr-cms-48/docs/user-guide/sdk/plugins/genai-prices-estimator/index.md) (1 shared tag)
+- [Objectives, constraints, and budget](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/objectives/index.md) (1 shared tag)
 - [Todos](/harness-sdk/pr-cms-48/docs/user-guide/sdk/plugins/todos/index.md) (1 shared tag)
-- [Coherence evaluator](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/evaluators/coherence_evaluator/index.md) (1 shared tag)
 
 
 ## Implementation
@@ -50103,8 +51837,8 @@ The preset handles large tool results eagerly, and the custom summarization stra
 - [Conversation Management](/harness-sdk/pr-cms-48/docs/user-guide/sdk/agents/conversation-management/index.md) (2 shared tags)
 - [Context Injector](/harness-sdk/pr-cms-48/docs/user-guide/sdk/plugins/context-injector/index.md) (1 shared tag)
 - [GenAI Prices Estimator](/harness-sdk/pr-cms-48/docs/user-guide/sdk/plugins/genai-prices-estimator/index.md) (1 shared tag)
+- [Objectives, constraints, and budget](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/objectives/index.md) (1 shared tag)
 - [Todos](/harness-sdk/pr-cms-48/docs/user-guide/sdk/plugins/todos/index.md) (1 shared tag)
-- [Coherence evaluator](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/evaluators/coherence_evaluator/index.md) (1 shared tag)
 
 
 ## Implementation
@@ -51654,6 +53388,7 @@ Every question allows `Uncertain` unless you turn it off, which [Questions and a
 
 - [Choosing an Agent Foundation](/harness-sdk/pr-cms-48/docs/user-guide/migrate/choosing-an-agent-foundation/index.md) (1 shared tag)
 - [Get started](/harness-sdk/pr-cms-48/docs/user-guide/sdk/quickstart/overview/index.md) (1 shared tag)
+- [Optimization quickstart](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/quickstart/index.md) (1 shared tag)
 - [Python Quickstart](/harness-sdk/pr-cms-48/docs/user-guide/sdk/quickstart/python/index.md) (1 shared tag)
 - [Strands evaluation quickstart](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/quickstart/index.md) (1 shared tag)
 - [Strands Shell quickstart](/harness-sdk/pr-cms-48/docs/user-guide/shell/quickstart/index.md) (1 shared tag)
@@ -51661,7 +53396,6 @@ Every question allows `Uncertain` unless you turn it off, which [Questions and a
 - [Use Strands with AI coding agents](/harness-sdk/pr-cms-48/docs/user-guide/build-with-ai/index.md) (1 shared tag)
 - [Decision models](/harness-sdk/pr-cms-48/docs/user-guide/sdk/decision-models/index.md) (1 shared tag)
 - [Decisions API](/harness-sdk/pr-cms-48/docs/user-guide/sdk/decision-models/models/decisions-api/index.md) (1 shared tag)
-- [Decisions in an agent](/harness-sdk/pr-cms-48/docs/user-guide/sdk/decision-models/agents/index.md) (1 shared tag)
 
 
 ## Implementation
@@ -72348,15 +74082,15 @@ The rendered text is a prompt-injection surface. If it interpolates attacker-inf
 ## Related pages
 
 - [GenAI Prices Estimator](/harness-sdk/pr-cms-48/docs/user-guide/sdk/plugins/genai-prices-estimator/index.md) (1 shared tag)
+- [Objectives, constraints, and budget](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/objectives/index.md) (1 shared tag)
 - [Todos](/harness-sdk/pr-cms-48/docs/user-guide/sdk/plugins/todos/index.md) (1 shared tag)
 - [Built-in Modes](/harness-sdk/pr-cms-48/docs/user-guide/sdk/context-management/built-in-modes/index.md) (1 shared tag)
 - [Context Estimation](/harness-sdk/pr-cms-48/docs/user-guide/sdk/context-management/context-estimation/index.md) (1 shared tag)
 - [Context management](/harness-sdk/pr-cms-48/docs/user-guide/sdk/context-management/index.md) (1 shared tag)
 - [Custom Strategies](/harness-sdk/pr-cms-48/docs/user-guide/sdk/context-management/custom-strategies/index.md) (1 shared tag)
 - [Strategy Presets](/harness-sdk/pr-cms-48/docs/user-guide/sdk/context-management/presets/index.md) (1 shared tag)
+- [Declaring what can change](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/tunables/index.md) (1 shared tag)
 - [Skills](/harness-sdk/pr-cms-48/docs/user-guide/sdk/plugins/skills/index.md) (1 shared tag)
-- [Context Offloader](/harness-sdk/pr-cms-48/docs/user-guide/sdk/plugins/context-offloader/index.md) (1 shared tag)
-- [Conversation Management](/harness-sdk/pr-cms-48/docs/user-guide/sdk/agents/conversation-management/index.md) (1 shared tag)
 
 
 ## Implementation
@@ -72818,8 +74552,8 @@ const agent = new Agent({
 - [Conversation Management](/harness-sdk/pr-cms-48/docs/user-guide/sdk/agents/conversation-management/index.md) (2 shared tags)
 - [Context Injector](/harness-sdk/pr-cms-48/docs/user-guide/sdk/plugins/context-injector/index.md) (1 shared tag)
 - [GenAI Prices Estimator](/harness-sdk/pr-cms-48/docs/user-guide/sdk/plugins/genai-prices-estimator/index.md) (1 shared tag)
+- [Objectives, constraints, and budget](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/objectives/index.md) (1 shared tag)
 - [Todos](/harness-sdk/pr-cms-48/docs/user-guide/sdk/plugins/todos/index.md) (1 shared tag)
-- [Coherence evaluator](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/evaluators/coherence_evaluator/index.md) (1 shared tag)
 
 
 ## Implementation
@@ -73439,15 +75173,15 @@ For what you were billed on Amazon Bedrock, use [application inference profiles]
 ## Related pages
 
 - [Context Injector](/harness-sdk/pr-cms-48/docs/user-guide/sdk/plugins/context-injector/index.md) (1 shared tag)
+- [Objectives, constraints, and budget](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/objectives/index.md) (1 shared tag)
 - [Todos](/harness-sdk/pr-cms-48/docs/user-guide/sdk/plugins/todos/index.md) (1 shared tag)
 - [Built-in Modes](/harness-sdk/pr-cms-48/docs/user-guide/sdk/context-management/built-in-modes/index.md) (1 shared tag)
 - [Context Estimation](/harness-sdk/pr-cms-48/docs/user-guide/sdk/context-management/context-estimation/index.md) (1 shared tag)
 - [Context management](/harness-sdk/pr-cms-48/docs/user-guide/sdk/context-management/index.md) (1 shared tag)
 - [Custom Strategies](/harness-sdk/pr-cms-48/docs/user-guide/sdk/context-management/custom-strategies/index.md) (1 shared tag)
 - [Strategy Presets](/harness-sdk/pr-cms-48/docs/user-guide/sdk/context-management/presets/index.md) (1 shared tag)
+- [Declaring what can change](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/tunables/index.md) (1 shared tag)
 - [Skills](/harness-sdk/pr-cms-48/docs/user-guide/sdk/plugins/skills/index.md) (1 shared tag)
-- [Context Offloader](/harness-sdk/pr-cms-48/docs/user-guide/sdk/plugins/context-offloader/index.md) (1 shared tag)
-- [Conversation Management](/harness-sdk/pr-cms-48/docs/user-guide/sdk/agents/conversation-management/index.md) (1 shared tag)
 
 
 ## Implementation
@@ -74281,16 +76015,16 @@ Use skills when you want a single agent that can handle a wide range of tasks by
 
 ## Related pages
 
+- [Declaring what can change](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/tunables/index.md) (2 shared tags)
 - [Context Injector](/harness-sdk/pr-cms-48/docs/user-guide/sdk/plugins/context-injector/index.md) (1 shared tag)
 - [GenAI Prices Estimator](/harness-sdk/pr-cms-48/docs/user-guide/sdk/plugins/genai-prices-estimator/index.md) (1 shared tag)
+- [Objectives, constraints, and budget](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/objectives/index.md) (1 shared tag)
 - [Todos](/harness-sdk/pr-cms-48/docs/user-guide/sdk/plugins/todos/index.md) (1 shared tag)
 - [Instruction following evaluator](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/evaluators/instruction_following_evaluator/index.md) (1 shared tag)
 - [Built-in Modes](/harness-sdk/pr-cms-48/docs/user-guide/sdk/context-management/built-in-modes/index.md) (1 shared tag)
 - [Context Estimation](/harness-sdk/pr-cms-48/docs/user-guide/sdk/context-management/context-estimation/index.md) (1 shared tag)
 - [Context management](/harness-sdk/pr-cms-48/docs/user-guide/sdk/context-management/index.md) (1 shared tag)
 - [Custom Strategies](/harness-sdk/pr-cms-48/docs/user-guide/sdk/context-management/custom-strategies/index.md) (1 shared tag)
-- [Strategy Presets](/harness-sdk/pr-cms-48/docs/user-guide/sdk/context-management/presets/index.md) (1 shared tag)
-- [Prompt Engineering](/harness-sdk/pr-cms-48/docs/user-guide/sdk/safety-security/prompt-engineering/index.md) (1 shared tag)
 
 
 ## Implementation
@@ -74407,14 +76141,14 @@ Each reminder adds the rendered list to a model call and changes the tail of tha
 
 - [Context Injector](/harness-sdk/pr-cms-48/docs/user-guide/sdk/plugins/context-injector/index.md) (1 shared tag)
 - [GenAI Prices Estimator](/harness-sdk/pr-cms-48/docs/user-guide/sdk/plugins/genai-prices-estimator/index.md) (1 shared tag)
+- [Objectives, constraints, and budget](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/objectives/index.md) (1 shared tag)
 - [Built-in Modes](/harness-sdk/pr-cms-48/docs/user-guide/sdk/context-management/built-in-modes/index.md) (1 shared tag)
 - [Context Estimation](/harness-sdk/pr-cms-48/docs/user-guide/sdk/context-management/context-estimation/index.md) (1 shared tag)
 - [Context management](/harness-sdk/pr-cms-48/docs/user-guide/sdk/context-management/index.md) (1 shared tag)
 - [Custom Strategies](/harness-sdk/pr-cms-48/docs/user-guide/sdk/context-management/custom-strategies/index.md) (1 shared tag)
 - [Strategy Presets](/harness-sdk/pr-cms-48/docs/user-guide/sdk/context-management/presets/index.md) (1 shared tag)
+- [Declaring what can change](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/tunables/index.md) (1 shared tag)
 - [Skills](/harness-sdk/pr-cms-48/docs/user-guide/sdk/plugins/skills/index.md) (1 shared tag)
-- [Context Offloader](/harness-sdk/pr-cms-48/docs/user-guide/sdk/plugins/context-offloader/index.md) (1 shared tag)
-- [Conversation Management](/harness-sdk/pr-cms-48/docs/user-guide/sdk/agents/conversation-management/index.md) (1 shared tag)
 
 
 ## Implementation
@@ -74659,6 +76393,7 @@ The table below compares feature availability between the Python and TypeScript 
 ## Related pages
 
 - [Choosing an Agent Foundation](/harness-sdk/pr-cms-48/docs/user-guide/migrate/choosing-an-agent-foundation/index.md) (1 shared tag)
+- [Optimization quickstart](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/quickstart/index.md) (1 shared tag)
 - [Python Quickstart](/harness-sdk/pr-cms-48/docs/user-guide/sdk/quickstart/python/index.md) (1 shared tag)
 - [Strands evaluation quickstart](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/quickstart/index.md) (1 shared tag)
 - [Strands Shell quickstart](/harness-sdk/pr-cms-48/docs/user-guide/shell/quickstart/index.md) (1 shared tag)
@@ -74986,6 +76721,7 @@ You have a running agent with a tool. From here:
 
 - [Choosing an Agent Foundation](/harness-sdk/pr-cms-48/docs/user-guide/migrate/choosing-an-agent-foundation/index.md) (1 shared tag)
 - [Get started](/harness-sdk/pr-cms-48/docs/user-guide/sdk/quickstart/overview/index.md) (1 shared tag)
+- [Optimization quickstart](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/quickstart/index.md) (1 shared tag)
 - [Strands evaluation quickstart](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/quickstart/index.md) (1 shared tag)
 - [Strands Shell quickstart](/harness-sdk/pr-cms-48/docs/user-guide/shell/quickstart/index.md) (1 shared tag)
 - [TypeScript Quickstart](/harness-sdk/pr-cms-48/docs/user-guide/sdk/quickstart/typescript/index.md) (1 shared tag)
@@ -75324,6 +77060,7 @@ You have a running agent with a tool. From here:
 
 - [Choosing an Agent Foundation](/harness-sdk/pr-cms-48/docs/user-guide/migrate/choosing-an-agent-foundation/index.md) (1 shared tag)
 - [Get started](/harness-sdk/pr-cms-48/docs/user-guide/sdk/quickstart/overview/index.md) (1 shared tag)
+- [Optimization quickstart](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/quickstart/index.md) (1 shared tag)
 - [Python Quickstart](/harness-sdk/pr-cms-48/docs/user-guide/sdk/quickstart/python/index.md) (1 shared tag)
 - [Strands evaluation quickstart](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/quickstart/index.md) (1 shared tag)
 - [Strands Shell quickstart](/harness-sdk/pr-cms-48/docs/user-guide/shell/quickstart/index.md) (1 shared tag)
@@ -84349,6 +86086,7 @@ You created a sandbox with exactly one host directory visible to it and ran a co
 
 - [Choosing an Agent Foundation](/harness-sdk/pr-cms-48/docs/user-guide/migrate/choosing-an-agent-foundation/index.md) (1 shared tag)
 - [Get started](/harness-sdk/pr-cms-48/docs/user-guide/sdk/quickstart/overview/index.md) (1 shared tag)
+- [Optimization quickstart](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/quickstart/index.md) (1 shared tag)
 - [Python Quickstart](/harness-sdk/pr-cms-48/docs/user-guide/sdk/quickstart/python/index.md) (1 shared tag)
 - [Strands evaluation quickstart](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/quickstart/index.md) (1 shared tag)
 - [TypeScript Quickstart](/harness-sdk/pr-cms-48/docs/user-guide/sdk/quickstart/typescript/index.md) (1 shared tag)

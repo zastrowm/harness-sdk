@@ -151,6 +151,7 @@ model = OpenAIRealtimeModel(
 
 - [Choosing an Agent Foundation](/harness-sdk/pr-cms-48/docs/user-guide/migrate/choosing-an-agent-foundation/index.md) (1 shared tag)
 - [Get started](/harness-sdk/pr-cms-48/docs/user-guide/sdk/quickstart/overview/index.md) (1 shared tag)
+- [Optimization quickstart](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/quickstart/index.md) (1 shared tag)
 - [Python Quickstart](/harness-sdk/pr-cms-48/docs/user-guide/sdk/quickstart/python/index.md) (1 shared tag)
 - [Strands evaluation quickstart](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/quickstart/index.md) (1 shared tag)
 - [Strands Shell quickstart](/harness-sdk/pr-cms-48/docs/user-guide/shell/quickstart/index.md) (1 shared tag)
@@ -158,7 +159,6 @@ model = OpenAIRealtimeModel(
 - [Use Strands with AI coding agents](/harness-sdk/pr-cms-48/docs/user-guide/build-with-ai/index.md) (1 shared tag)
 - [BidiAgent](/harness-sdk/pr-cms-48/docs/user-guide/sdk/bidi/agent/index.md) (1 shared tag)
 - [Bidirectional Streaming](/harness-sdk/pr-cms-48/docs/user-guide/sdk/bidi/index.md) (1 shared tag)
-- [Bidirectional Streaming Models](/harness-sdk/pr-cms-48/docs/user-guide/sdk/bidi/models/index.md) (1 shared tag)
 
 
 ## Implementation

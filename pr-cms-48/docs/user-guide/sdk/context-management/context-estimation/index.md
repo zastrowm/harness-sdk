@@ -80,8 +80,8 @@ Both the built-in [context management modes](/harness-sdk/pr-cms-48/docs/user-gu
 - [Conversation Management](/harness-sdk/pr-cms-48/docs/user-guide/sdk/agents/conversation-management/index.md) (2 shared tags)
 - [Context Injector](/harness-sdk/pr-cms-48/docs/user-guide/sdk/plugins/context-injector/index.md) (1 shared tag)
 - [GenAI Prices Estimator](/harness-sdk/pr-cms-48/docs/user-guide/sdk/plugins/genai-prices-estimator/index.md) (1 shared tag)
+- [Objectives, constraints, and budget](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/objectives/index.md) (1 shared tag)
 - [Todos](/harness-sdk/pr-cms-48/docs/user-guide/sdk/plugins/todos/index.md) (1 shared tag)
-- [Coherence evaluator](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/evaluators/coherence_evaluator/index.md) (1 shared tag)
 
 
 ## Implementation

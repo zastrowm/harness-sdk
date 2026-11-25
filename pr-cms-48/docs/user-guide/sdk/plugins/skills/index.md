@@ -377,16 +377,16 @@ Use skills when you want a single agent that can handle a wide range of tasks by
 
 ## Related pages
 
+- [Declaring what can change](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/tunables/index.md) (2 shared tags)
 - [Context Injector](/harness-sdk/pr-cms-48/docs/user-guide/sdk/plugins/context-injector/index.md) (1 shared tag)
 - [GenAI Prices Estimator](/harness-sdk/pr-cms-48/docs/user-guide/sdk/plugins/genai-prices-estimator/index.md) (1 shared tag)
+- [Objectives, constraints, and budget](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/objectives/index.md) (1 shared tag)
 - [Todos](/harness-sdk/pr-cms-48/docs/user-guide/sdk/plugins/todos/index.md) (1 shared tag)
 - [Instruction following evaluator](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/evaluators/instruction_following_evaluator/index.md) (1 shared tag)
 - [Built-in Modes](/harness-sdk/pr-cms-48/docs/user-guide/sdk/context-management/built-in-modes/index.md) (1 shared tag)
 - [Context Estimation](/harness-sdk/pr-cms-48/docs/user-guide/sdk/context-management/context-estimation/index.md) (1 shared tag)
 - [Context management](/harness-sdk/pr-cms-48/docs/user-guide/sdk/context-management/index.md) (1 shared tag)
 - [Custom Strategies](/harness-sdk/pr-cms-48/docs/user-guide/sdk/context-management/custom-strategies/index.md) (1 shared tag)
-- [Strategy Presets](/harness-sdk/pr-cms-48/docs/user-guide/sdk/context-management/presets/index.md) (1 shared tag)
-- [Prompt Engineering](/harness-sdk/pr-cms-48/docs/user-guide/sdk/safety-security/prompt-engineering/index.md) (1 shared tag)
 
 
 ## Implementation

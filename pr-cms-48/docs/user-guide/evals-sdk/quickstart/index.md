@@ -128,6 +128,7 @@ You have a running evaluation. From here, a natural path forward:
 
 - [Choosing an Agent Foundation](/harness-sdk/pr-cms-48/docs/user-guide/migrate/choosing-an-agent-foundation/index.md) (1 shared tag)
 - [Get started](/harness-sdk/pr-cms-48/docs/user-guide/sdk/quickstart/overview/index.md) (1 shared tag)
+- [Optimization quickstart](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/optimization/quickstart/index.md) (1 shared tag)
 - [Python Quickstart](/harness-sdk/pr-cms-48/docs/user-guide/sdk/quickstart/python/index.md) (1 shared tag)
 - [Strands Shell quickstart](/harness-sdk/pr-cms-48/docs/user-guide/shell/quickstart/index.md) (1 shared tag)
 - [TypeScript Quickstart](/harness-sdk/pr-cms-48/docs/user-guide/sdk/quickstart/typescript/index.md) (1 shared tag)
