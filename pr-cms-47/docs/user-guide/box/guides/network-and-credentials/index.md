@@ -1,10 +1,10 @@
 An `[egress.<name>]` table in `box.toml` binds a credential to a set of destinations. The box’s egress gateway adds the credential to each request to those destinations. Policy decides whether each request goes out.
 
-Audience: an operator with a working box from [getting started](/harness-sdk/pr-cms-47/docs/user-guide/box/core/quickstart/index.md) who gives the agent a credential for a service. For how the gateway decides and forwards each request, read [how Box controls outbound traffic](https://github.com/strands-agents/box/blob/1a1b57e8ee8cfb24b13537949de16f0e52cfcb52/docs/design/egress.md).
+Audience: an operator with a working box from [getting started](/harness-sdk/pr-cms-47/docs/user-guide/box/core/quickstart/index.md) who gives the agent a credential for a service. For how the gateway decides and forwards each request, read [how Box controls outbound traffic](https://github.com/strands-agents/box/blob/2ce2b4b9db572380184ea25e6b0de768fcb4c6c1/docs/design/egress.md).
 
 A tool or local MCP server with `network.contain_egress = false` can connect directly, outside gateway policy. On Linux, this includes IPv4 access to reachable private networks, loopback services, and instance metadata endpoints. See [server network settings](/harness-sdk/pr-cms-47/docs/user-guide/box/guides/add-an-mcp-server/index.md#network).
 
-Such a program connects as it would on the host. Box sets no proxy variable and no CA file for it, so it uses its own defaults and verifies the real server’s certificate. Its table’s `env` may set `HTTPS_PROXY`, `SSL_CERT_FILE`, `GIT_SSL_CAINFO` and the other proxy and CA names, for a company proxy or CA bundle; add a `read_file` entry for a file it names. On macOS, the program may ask the system’s certificate services (`trustd` and `SecurityServer`), and keychain files stay unreadable. On Linux, if the default bundle is a link outside `/etc/ssl`, such as into `/etc/pki`, add a `read` entry for it. The startup report shows a `native trust:` line for the program. See [a native-egress process keeps its own proxy and trust settings](https://github.com/strands-agents/box/blob/1a1b57e8ee8cfb24b13537949de16f0e52cfcb52/docs/design/decisions.md#a-native-egress-process-keeps-its-own-proxy-and-trust-settings).
+Such a program connects as it would on the host. Box sets no proxy variable and no CA file for it, so it uses its own defaults and verifies the real server’s certificate. Its table’s `env` may set `HTTPS_PROXY`, `SSL_CERT_FILE`, `GIT_SSL_CAINFO` and the other proxy and CA names, for a company proxy or CA bundle; add a `read_file` entry for a file it names. On macOS, the program may ask the system’s certificate services (`trustd` and `SecurityServer`), and keychain files stay unreadable. On Linux, if the default bundle is a link outside `/etc/ssl`, such as into `/etc/pki`, add a `read` entry for it. The startup report shows a `native trust:` line for the program. See [a native-egress process keeps its own proxy and trust settings](https://github.com/strands-agents/box/blob/2ce2b4b9db572380184ea25e6b0de768fcb4c6c1/docs/design/decisions.md#a-native-egress-process-keeps-its-own-proxy-and-trust-settings).
 
 ## Example
 
@@ -22,7 +22,7 @@ secret.ref   = "aws://my-profile"
 
 `box run` reads `GITHUB_TOKEN` from its own environment. The agent gets a placeholder in `GITHUB_TOKEN`, and sends it as it would send the token. The gateway replaces the placeholder with the real token on each request to `api.github.com`.
 
-> **Every process in the box can use every route.** The agent, each tool, each stdio MCP server, and the Shell that runs the agent’s commands get the same placeholders, and the gateway adds the real credential to a request from any of them. The gateway can’t tell which process sent a request, so no setting limits a route to one process. To keep a credential away from a tool or a server, run it in a separate box. [The box is the credential boundary](https://github.com/strands-agents/box/blob/1a1b57e8ee8cfb24b13537949de16f0e52cfcb52/docs/design/decisions.md#the-box-is-the-credential-boundary) explains why.
+> **Every process in the box can use every route.** The agent, each tool, each stdio MCP server, and the Shell that runs the agent’s commands get the same placeholders, and the gateway adds the real credential to a request from any of them. The gateway can’t tell which process sent a request, so no setting limits a route to one process. To keep a credential away from a tool or a server, run it in a separate box. [The box is the credential boundary](https://github.com/strands-agents/box/blob/2ce2b4b9db572380184ea25e6b0de768fcb4c6c1/docs/design/decisions.md#the-box-is-the-credential-boundary) explains why.
 
 To let the requests out, permit them in `policy.dw`:
 
@@ -71,7 +71,7 @@ Each entry in `destinations` is a host, with an optional port and path.
 | `api.example.com/v1` | Paths under `/v1` on that host, by whole segment |
 | `api.example.com/*/upload` | Paths on that host that end in `/upload` |
 
-A host is matched in lowercase. A path is matched case-sensitively, against the path in the gateway’s canonical form. Two routes, or two entries in one route, can’t match the same destination, and an http MCP server’s host can’t appear in a route.
+A host is matched in lowercase. Write it as the gateway sees it on a connection: ASCII letters, digits, `.`, `-`, and `_`, with no empty label. Write an internationalized name in its punycode form, such as `xn--bcher-kva.example` for `bücher.example`. The loader refuses another spelling, such as `.api.example.com`, `api..example.com`, or `bücher.example`, because no connection could match it. It also refuses a name that ends in a number, such as `10.5` or `0x7f.1`, because a resolver reads it as an IPv4 address: write an IP address as four decimal numbers, such as `10.0.0.5`. A label holds at most 63 bytes, and a name at most 253. The loader removes a trailing dot from a host, so `api.example.com.` loads as `api.example.com`, as the gateway compares it. A path is matched case-sensitively, against the path in the gateway’s canonical form. Two routes, or two entries in one route, can’t match the same destination, and an http MCP server’s host can’t appear in a route.
 
 The canonical form keeps repeated slashes, and a path prefix matches by whole segment. So `api.example.com/v1` covers `/v1//chat`, and `api.example.com/v1/chat` doesn’t cover `/v1//chat`. [Forbid one URL path on a host](/harness-sdk/pr-cms-47/docs/user-guide/box/reference/policy/index.md#forbid-one-url-path-on-a-host) shows rules for these paths in policy.
 
@@ -98,7 +98,7 @@ The box dials the backend’s host and port, presents the backend host for TLS a
 
 A `secret` on the entry may sit beside a backend, but only as `env://`, and it is phantom-only: the box provisions a placeholder in the named variable (so the agent’s credential-shaped code works) and strips it from the request, and never sends the real value. The backend handles the destination’s auth downstream. Because the box never reads the real value, the named variable may be unset, and `secret.inject` is refused (there is nothing to inject). A signed destination `secret` (`aws://` or `credsd://`) is refused beside a backend, because it mints no placeholder to strip. A destination `secret` in a declared scheme is refused too, because the box never reads that secret.
 
-When the backend `url` has a path prefix, the box refuses a request whose path contains an encoded slash (`%2F`) or backslash (`%5C`): joining a prefix in front of an escaped separator could change which path the backend sees, so the box fails the request rather than risk a traversal. This rejects some legitimate requests, for example a GitLab path such as `/api/v4/projects/1/repository/files/src%2FREADME.md`. If a destination needs encoded separators, give the backend a **dedicated host with no path prefix** (`url = "https://gw.example.com"`), which carries no join and so no restriction.
+When the backend `url` has a path prefix, the box refuses a request whose path a backend could fold out of that prefix. It refuses a `;`, a segment that starts with two dots once each escaped space (`%20`), plus sign (`+`), and escaped plus sign (`%2B`) is removed, such as `...`, `..%20`, `+..`, `..+`, or `..b`, and a percent-escape of a slash (`%2F`), a backslash (`%5C`), a percent sign (`%25`), a `;`, `?`, or `#` (`%3B`, `%3F`, `%23`), a control character, or a byte at or above `%80`. Each one can change which path the backend sees after the prefix is joined, so the box fails the request with `403` rather than risk a traversal. Other escapes, such as `%3A`, pass. This rejects some legitimate requests, for example a GitLab path such as `/api/v4/projects/1/repository/files/src%2FREADME.md`. If a destination needs these spellings, give the backend a **dedicated host with no path prefix** (`url = "https://gw.example.com"`), which carries no join and so no restriction.
 
 A backend’s `auth` rides an `https` backend. An `env://` token is attached as-is; an `aws://` profile is SigV4-signed over the **backend** host. The box signs the request after it rewrites the `Host` to the backend, so the signature covers the bytes the backend receives. The service and region are **stated explicitly** in `backends.auth.aws` (e.g. `service = "bedrock-agentcore"`, `region = "us-east-1"`); the box does not guess them from the host, because a gateway or custom-domain host carries no standard AWS scope. A `credsd://` auth is refused.
 
@@ -115,6 +115,8 @@ An entry may keep its own `secret` beside a backend, and it must be `env://`. It
 A backend entry names exactly one destination with an exact host: no path, no wildcard, and not several destinations. The box presents the backend host on the wire, so distinct origins sent to one backend would reach it as the same bytes with the agent’s host lost. Write one entry per host.
 
 A host that re-routes to a backend may be named by no other entry, on any port. The box matches a re-route by host alone, so any other entry that covers the host would load and then be refused on every request. That includes a direct entry on another port, a second backend, or a `*`/`*.suffix` wildcard that spans it. The loader refuses the pair instead.
+
+The box dials a backend host directly. So a backend `url` host may not be a host that another entry re-routes to its own backend, or a remote MCP server’s host. The loader refuses either pair, because the dial would skip that entry’s re-route or the server’s `mcp:call` decisions. The backend `url` host follows the same spelling rule as a destination host.
 
 This version re-routes to one backend. More than one backend and routing rules are not yet available.
 
@@ -139,7 +141,7 @@ This build does **not** resolve **AWS SSO** or `aws login` profiles (the SDK’s
 Because a bare `aws://` signs with whatever identity the host carries, the box prints a warning in the startup disclosure, once for each destination that signs this way:
 
 ```plaintext
-strands-box: warning: aws:// for bedrock-runtime.us-west-2.amazonaws.com signs with this machine's AWS identity
+strands-box: warning[B0602]: aws:// for bedrock-runtime.us-west-2.amazonaws.com signs with this machine's AWS identity
 ```
 
 The line names the destination as the route writes it, so a box with two such destinations prints two lines.
@@ -190,7 +192,7 @@ Some company networks re-sign HTTPS traffic with their own root certificate. The
 The gateway reads the roots once, when the box starts, and stderr says how many it added:
 
 ```text
-strands-box: the egress gateway also trusts 136 root certificates from this host's trust store for upstream servers (0 ignored)
+strands-box: note[B0204]: the egress gateway also trusts 136 root certificates from this host's trust store for upstream servers (0 ignored)
 ```
 
 A trusted root can vouch for any server, and the network that re-signs the traffic reads every request in plain text, including each credential the gateway adds. Policy still decides every destination.
@@ -221,6 +223,10 @@ The list applies to every process in the box. An entry is a host name alone: the
 | Cause | Fix |
 | --- | --- |
 | A route has no `destinations`, or an entry is empty, `*`, or has port `0` | Name each host the credential goes to. |
+| A destination host or a `backends.url` host has an empty label, or a character other than an ASCII letter, a digit, `.`, `-`, or `_` | Write the host as a connection names it, such as `api.example.com`. Write an internationalized name in its punycode (`xn--`) form. |
+| A destination host or a `backends.url` host ends in a number, such as `10.5` | Write an IPv4 address as four decimal numbers with no leading zero, such as `10.0.0.5`. |
+| A destination host or a `backends.url` host is longer than DNS allows | Write a host whose labels hold at most 63 bytes, and whose name holds at most 253. |
+| A `backends.url` host is a host that another entry re-routes, or a remote MCP server’s host | Point the backend at a host that no other entry re-routes and that serves no declared MCP server. |
 | Two routes, or two entries in one route, match the same destination | Narrow one of them, for example by path or port. |
 | A route names an http MCP server’s host | Put the credential on the `[mcp.<name>]` table. |
 | An entry declares more than one backend | Keep one backend. Routing across several is not yet available. |
@@ -274,7 +280,7 @@ A request the gateway doesn’t refuse but can’t complete gets an HTTP 502 wit
 | `io error: upstream deadline passed` | The server didn’t reply within the upstream deadline. |
 | `effect interceptor unavailable` | The box’s policy check failed. |
 
-Except for `effect interceptor unavailable`, policy permitted the request, so it may have reached the server. The box also prints the reason on stderr, naming the backend when the destination re-routes to one: `strands-box: warning: egress request to <host>:<port> failed: <reason>`.
+Except for `effect interceptor unavailable`, policy permitted the request, so it may have reached the server. The box also prints the reason on stderr, naming the backend when the destination re-routes to one: `strands-box: warning[B0501]: egress request to <host>:<port> failed: <reason>`.
 
 A 502 with no `x-strands-box-egress` header answers a `CONNECT`, or a plain `http://` request, that the gateway couldn’t resolve or connect to. Any other 502 without the header comes from the server.
 
@@ -297,5 +303,5 @@ Without forced termination, Box waits for active upstream exchanges and other wo
 
 ## See also
 
--   [How Box controls outbound traffic](https://github.com/strands-agents/box/blob/1a1b57e8ee8cfb24b13537949de16f0e52cfcb52/docs/design/egress.md): routing, the connect and request decisions, and how the gateway adds a credential.
+-   [How Box controls outbound traffic](https://github.com/strands-agents/box/blob/2ce2b4b9db572380184ea25e6b0de768fcb4c6c1/docs/design/egress.md): routing, the connect and request decisions, and how the gateway adds a credential.
 -   [The `[mcp.<name>]` table](/harness-sdk/pr-cms-47/docs/user-guide/box/guides/add-an-mcp-server/index.md): a credential for an http MCP server.

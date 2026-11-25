@@ -1,6 +1,6 @@
 Use this page when `box` stops with an error, or when the agent can’t do something in the box. Most messages that start with `box: error:` name their own fix, so this page covers the ones that don’t, and the failures that show up after the box starts. Search the page for a few words of your message. The examples use `/Users/you` for your home folder.
 
-This page covers what every [pack](https://github.com/strands-agents/box/blob/1a1b57e8ee8cfb24b13537949de16f0e52cfcb52/docs/cli/README.md#packs) and [plugin](https://github.com/strands-agents/box/blob/1a1b57e8ee8cfb24b13537949de16f0e52cfcb52/docs/cli/README.md#plugins) can hit, such as `@box/claude`, which runs Claude Code. An error that only one pack or plugin prints, and its fix, is in the **Troubleshooting** section of its README, and its own limits are in its **Limitations** section.
+This page covers what every [pack](https://github.com/strands-agents/box/blob/2ce2b4b9db572380184ea25e6b0de768fcb4c6c1/docs/cli/README.md#packs) and [plugin](https://github.com/strands-agents/box/blob/2ce2b4b9db572380184ea25e6b0de768fcb4c6c1/docs/cli/README.md#plugins) can hit, such as `@box/claude`, which runs Claude Code. An error that only one pack or plugin prints, and its fix, is in the **Troubleshooting** section of its README, and its own limits are in its **Limitations** section.
 
 ## Before the box starts
 
@@ -53,7 +53,7 @@ To stop the note for a toolchain you don’t need, delete its pack from the `pac
 Some tools are one file with several names, such as rustup’s `cargo` and `rustc`. Before a run, the box checks that no name of the tool is in your project. On a Mac, and on Linux in Docker or on btrfs, it reads every folder to do that, and if it can’t finish, the run stops:
 
 ```text
-strands-box: error: `[agent]` filesystem entry "<project>" is refused: this write grant cannot be inspected for configured command hard links: directory inspection failed: Permission denied (os error 13).
+strands-box: error[B0102]: `[agent]` filesystem entry "<project>" is refused: this write grant cannot be inspected for configured command hard links: directory inspection failed: Permission denied (os error 13).
 ```
 
 That happens when a folder in your project is one you can’t read, such as a database folder another user owns, when a folder changes while the box reads it, such as `.git` while your editor runs `git status`, or when the project is too big to read in 30 seconds. Make the folder readable or move it out of the project, or close the program that changes it, and run again. You can also take the tool’s pack off the `packs` line in `profile.toml`.
@@ -119,7 +119,7 @@ Box Core reports this when the full socket path is too long. With the default `~
 ### A run in an earlier box stops on a clock error
 
 ```text
-strands-box: error: policy staging failed: policy staging history failure: durable timestamp 1795305600000000000 is 3600000000000 ns ahead of the current clock 1795302000000000000, exceeding the maximum allowed future skew of 300000000000 ns; refusing the operation rather than issuing future-dated timestamps
+strands-box: error[B0103]: policy staging failed: policy staging history failure: durable timestamp 1795305600000000000 is 3600000000000 ns ahead of the current clock 1795302000000000000, exceeding the maximum allowed future skew of 300000000000 ns; refusing the operation rather than issuing future-dated timestamps
 ```
 
 The box’s history is stamped more than five minutes ahead of the clock. This happens after the clock moves back, such as after a clock reset or a restored virtual machine. Box refuses, because a history that looks like the future would let rules that count over time count wrongly.
@@ -276,7 +276,7 @@ box profile create claude-api --with claude,anthropic --option claude.host=anthr
 ### The credential variable isn’t set
 
 ```text
-strands-box: error: credential setup failed: credential variable AWS_BEARER_TOKEN_BEDROCK is not set, or holds only whitespace
+strands-box: error[B0104]: credential setup failed: credential variable AWS_BEARER_TOKEN_BEDROCK is not set, or holds only whitespace
 ```
 
 The box reads the model key from the variable the message names, in the shell you ran `box run` in, and the variable isn’t set there. Did you open a new terminal window? An `export` lasts only in the window you ran it in. Run the `export` command from [Get started](/harness-sdk/pr-cms-47/docs/user-guide/box/quickstart/index.md) in this window, then start the run again.

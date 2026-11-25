@@ -13,7 +13,7 @@ Install your agent, such as Claude Code, and set up its credentials first. The i
 Download the installer and run it:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/strands-agents/box/1a1b57e8ee8cfb24b13537949de16f0e52cfcb52/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/strands-agents/box/2ce2b4b9db572380184ea25e6b0de768fcb4c6c1/install.sh | sh
 ```
 
 Example output on a Mac:
@@ -35,7 +35,7 @@ box run claude                             # Run from your project
 
 box sends usage telemetry to telemetry.strandsagents.com
 To opt out, run: box telemetry off
-To learn more: https://github.com/strands-agents/box/blob/1a1b57e8ee8cfb24b13537949de16f0e52cfcb52/CLI_TELEMETRY.md
+To learn more: https://github.com/strands-agents/box/blob/2ce2b4b9db572380184ea25e6b0de768fcb4c6c1/CLI_TELEMETRY.md
 ```
 
 In a color terminal, a progress bar replaces the `Downloading` and `Installed` lines. On Linux, the check line is `Verified checksum and archive`, because there are no Apple checks. The telemetry lines appear only while telemetry is on, so if you’ve already [turned it off](/harness-sdk/pr-cms-47/docs/user-guide/box/reference/cli/index.md#box-telemetry), a new install keeps that choice and leaves them out.
@@ -70,7 +70,7 @@ The installer reads your shell from `SHELL`. If `SHELL` is unset, it uses zsh on
 To upgrade to the latest release, run the install command again. To install another release, run the installer again with its number in `BOX_VERSION`:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/strands-agents/box/1a1b57e8ee8cfb24b13537949de16f0e52cfcb52/install.sh | BOX_VERSION=0.3.1 sh
+curl -fsSL https://raw.githubusercontent.com/strands-agents/box/2ce2b4b9db572380184ea25e6b0de768fcb4c6c1/install.sh | BOX_VERSION=0.3.1 sh
 ```
 
 It switches `current` to that release, prints `Updated box 0.3.0 to 0.3.1.`, and then shows the same welcome as a first install. When you have that release already, it prints `box 0.3.1 is already installed.` and keeps your release, without the welcome. If you installed with any of the other [installer variables](#installer-variables), set them again.
@@ -92,7 +92,7 @@ Old releases stay in `~/.strands/box/packages/`. Installing one you already have
 To install from another public repository, such as your own fork, name it in `BOX_GITHUB_REPO`. On macOS, a release that isn’t signed by the Box publisher, such as a fork’s own build, also needs `BOX_ALLOW_UNSIGNED=1`:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/strands-agents/box/1a1b57e8ee8cfb24b13537949de16f0e52cfcb52/install.sh |
+curl -fsSL https://raw.githubusercontent.com/strands-agents/box/2ce2b4b9db572380184ea25e6b0de768fcb4c6c1/install.sh |
   BOX_GITHUB_REPO=your-account/box BOX_ALLOW_UNSIGNED=1 sh
 ```
 
@@ -101,7 +101,7 @@ curl -fsSL https://raw.githubusercontent.com/strands-agents/box/1a1b57e8ee8cfb24
 ## Manage PATH without the installer
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/strands-agents/box/1a1b57e8ee8cfb24b13537949de16f0e52cfcb52/install.sh |
+curl -fsSL https://raw.githubusercontent.com/strands-agents/box/2ce2b4b9db572380184ea25e6b0de768fcb4c6c1/install.sh |
   BOX_NO_MODIFY_PATH=1 sh
 ```
 
@@ -118,7 +118,7 @@ just build-cli
 export PATH="$PWD/target/debug:$PATH"
 ```
 
-The build uses the packs and starters in the checkout’s `resources/`. The `export` lasts only in this terminal, so add `target/debug` to your `PATH` in your shell’s startup file to keep it. [CONTRIBUTING.md](https://github.com/strands-agents/box/blob/1a1b57e8ee8cfb24b13537949de16f0e52cfcb52/CONTRIBUTING.md) has more on building from source.
+The build uses the packs and starters in the checkout’s `resources/`. The `export` lasts only in this terminal, so add `target/debug` to your `PATH` in your shell’s startup file to keep it. [CONTRIBUTING.md](https://github.com/strands-agents/box/blob/2ce2b4b9db572380184ea25e6b0de768fcb4c6c1/CONTRIBUTING.md) has more on building from source.
 
 ## Uninstall
 

@@ -188,5 +188,5 @@ permit  shell:spawn  /Library/Developer/CommandLineTools/usr/bin/git add todo.tx
 ## See also
 
 -   [Strands Shell reference](/harness-sdk/pr-cms-47/docs/user-guide/box/reference/shell/index.md): every field, action, and exit status.
--   [How Box runs shell commands and programs](https://github.com/strands-agents/box/blob/1a1b57e8ee8cfb24b13537949de16f0e52cfcb52/docs/design/shell.md): the order of the checks.
--   [Policy in the design guide](https://github.com/strands-agents/box/blob/1a1b57e8ee8cfb24b13537949de16f0e52cfcb52/docs/design/policy.md): how the engine decides, and what refuses to load.
+-   [How Box runs shell commands and programs](https://github.com/strands-agents/box/blob/2ce2b4b9db572380184ea25e6b0de768fcb4c6c1/docs/design/shell.md): the order of the checks.
+-   [Policy in the design guide](https://github.com/strands-agents/box/blob/2ce2b4b9db572380184ea25e6b0de768fcb4c6c1/docs/design/policy.md): how the engine decides, and what refuses to load.

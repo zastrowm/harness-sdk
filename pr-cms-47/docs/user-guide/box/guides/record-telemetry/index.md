@@ -119,7 +119,7 @@ A credential needs an `https://` destination, unless the destination is loopback
 Box sends each batch once, with one four-second deadline that covers the credential lookup and the send. A batch that fails is counted, and the box does not retry it. When the run ends, Box prints one line on stderr with the count (see [Errors and exit codes](#errors-and-exit-codes)). To see why a send failed, set `STRANDS_BOX_TELEMETRY_DEBUG` to any non-empty value in the environment of `strands-box run`. Box then also prints each failure on stderr as it happens, with its full cause and the start of the endpoint’s answer. Box redacts each credential it attached from that answer, so an endpoint that echoes a refused key does not put the key in your logs:
 
 ```text
-strands-box: telemetry export failed: https://cloud.langfuse.com/api/public/otel/v1/traces answered 401 Unauthorized: ...
+telemetry: warning[T0102]: telemetry export failed: https://cloud.langfuse.com/api/public/otel/v1/traces answered 401 Unauthorized: ...
 ```
 
 ## The workload’s own signals
@@ -308,7 +308,7 @@ otel-tui --from-json-file ~/boxes/codex/records.jsonl
 
 A telemetry error stops the run before the workload starts, so the agent never runs. `strands-box` prints the reason on stderr and exits `1`.
 
-Exit `1` alone does not prove that Box refused, because a workload is free to exit `1` as well. The message does: Box prefixes every line it prints with `strands-box:`.
+Exit `1` alone does not prove that Box refused, because a workload is free to exit `1` as well. The message does: a telemetry refusal reads `telemetry: error[T0103]: ...`. See [message codes](/harness-sdk/pr-cms-47/docs/user-guide/box/reference/message-codes/index.md).
 
 | What the operator sees | Cause |
 | --- | --- |
@@ -336,8 +336,8 @@ A target that fails while the box runs loses the record, and Box does not retry.
 -   The final export did not finish in time.
 
 ```text
-strands-box: warning: telemetry records were lost: 441 records were dropped before export to the configured targets
-strands-box: warning: telemetry records were lost: 2 exports to the configured targets failed
+telemetry: warning[T0101]: telemetry records were lost: 441 records were dropped before export to the configured targets
+telemetry: warning[T0101]: telemetry records were lost: 2 exports to the configured targets failed
 ```
 
 When more than one cause applies, the line names each of them. The run’s exit code does not change.
@@ -349,4 +349,4 @@ Set `STRANDS_BOX_TELEMETRY_DEBUG` to also print each failed export as it happens
 ## See also
 
 -   [Getting started](/harness-sdk/pr-cms-47/docs/user-guide/box/core/quickstart/index.md): install Box, then run Claude Code or Codex in a box.
--   [How telemetry works](https://github.com/strands-agents/box/blob/1a1b57e8ee8cfb24b13537949de16f0e52cfcb52/docs/design/telemetry.md): which process records, what a workload cannot forge, and where a record can be lost.
+-   [How telemetry works](https://github.com/strands-agents/box/blob/2ce2b4b9db572380184ea25e6b0de768fcb4c6c1/docs/design/telemetry.md): which process records, what a workload cannot forge, and where a record can be lost.

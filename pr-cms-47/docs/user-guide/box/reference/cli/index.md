@@ -424,7 +424,7 @@ TIME (UTC)  RESULT  ACTION  RESOURCE  RULE  REASON
 
 ## box telemetry
 
-Turn usage telemetry on or off. [Usage telemetry](https://github.com/strands-agents/box/blob/1a1b57e8ee8cfb24b13537949de16f0e52cfcb52/CLI_TELEMETRY.md) says what `box` sends.
+Turn usage telemetry on or off. [Usage telemetry](https://github.com/strands-agents/box/blob/2ce2b4b9db572380184ea25e6b0de768fcb4c6c1/CLI_TELEMETRY.md) says what `box` sends.
 
 ```sh
 box telemetry off
@@ -479,7 +479,7 @@ The model key’s variable is the one `box profile create` named. The installer 
 | Status | When |
 | --- | --- |
 | `0` | The command succeeded. |
-| `1` | An error. An error from `box` starts with `box: error:`, and one that stops a box as it starts begins with `strands-box: error:`. Most name their own fix. For the rest, see [Troubleshooting](/harness-sdk/pr-cms-47/docs/user-guide/box/troubleshooting/index.md). `box runs history` also exits with `1` when it can’t read a line of the run’s log, after it shows the rest. |
+| `1` | An error. An error from `box` starts with `box: error:`, and one that stops a box as it starts is a Box message with the severity `error`, such as `strands-box: error[<code>]:`. Box’s [message codes](/harness-sdk/pr-cms-47/docs/user-guide/box/reference/message-codes/index.md) explain each code. Most name their own fix. For the rest, see [Troubleshooting](/harness-sdk/pr-cms-47/docs/user-guide/box/troubleshooting/index.md). `box runs history` also exits with `1` when it can’t read a line of the run’s log, after it shows the rest. |
 | `2` | The command line is wrong, such as an unknown flag. |
 | `130` | You pressed Ctrl+C at a prompt. |
 
