@@ -1,6 +1,6 @@
 A box runs the agent’s Python scripts in [Monty](https://github.com/pydantic/monty), an interpreter for a subset of Python. Policy decides each file operation a script makes, and the egress gateway decides each request a script sends with `fetch()`.
 
-Audience: an operator with a working box from [getting started](/harness-sdk/pr-cms-47/docs/user-guide/box/core/quickstart/index.md) whose agent runs Python. For how Box runs a script and why a script cannot act on its own, read [how Box runs Python scripts](https://github.com/strands-agents/box/blob/2ce2b4b9db572380184ea25e6b0de768fcb4c6c1/docs/design/monty.md).
+Audience: an operator with a working box from [getting started](/harness-sdk/pr-cms-47/docs/user-guide/box/core/quickstart/index.md) whose agent runs Python. For how Box runs a script and why a script cannot act on its own, read [how Box runs Python scripts](https://github.com/strands-agents/box/blob/1c2c9110f5bb5b9ca4c7c2eb63644ab05830aa4a/docs/design/monty.md).
 
 ## Example
 
@@ -216,5 +216,5 @@ The decision log records each decision with the rule’s `@id` ([getting started
 
 ## See also
 
--   [How Box runs Python scripts](https://github.com/strands-agents/box/blob/2ce2b4b9db572380184ea25e6b0de768fcb4c6c1/docs/design/monty.md): the routes, the steps for each file operation, and the residual risk.
+-   [How Box runs Python scripts](https://github.com/strands-agents/box/blob/1c2c9110f5bb5b9ca4c7c2eb63644ab05830aa4a/docs/design/monty.md): the routes, the steps for each file operation, and the residual risk.
 -   [The `[egress.<name>]` table](/harness-sdk/pr-cms-47/docs/user-guide/box/guides/network-and-credentials/index.md): the rules for a host, and a credential that the gateway adds to a request.

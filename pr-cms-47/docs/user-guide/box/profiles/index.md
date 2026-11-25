@@ -90,7 +90,7 @@ Add its pack to `packs`, or delete it. `@box/npm` brings `@box/node` with it, be
 box: skipped tool cargo (@box/cargo): cargo is not on PATH
 ```
 
-Be choosy. A toolchain runs code from your project (git hooks, `build.rs`, npm scripts) that the agent can write, so whatever a toolchain can reach, the agent can too. [Packs](https://github.com/strands-agents/box/blob/2ce2b4b9db572380184ea25e6b0de768fcb4c6c1/docs/cli/README.md#packs) lists the tool packs that Box ships.
+Be choosy. A toolchain runs code from your project (git hooks, `build.rs`, npm scripts) that the agent can write, so whatever a toolchain can reach, the agent can too. [Packs](https://github.com/strands-agents/box/blob/1c2c9110f5bb5b9ca4c7c2eb63644ab05830aa4a/docs/cli/README.md#packs) lists the tool packs that Box ships.
 
 ### Change a toolchain’s settings
 
@@ -149,7 +149,7 @@ Then `git push` and `git pull` work in the box, over HTTPS and for a `git@github
 
 ### Read a token from your vault
 
-If the token lives in a password manager, the box can read it for you when it starts, so there’s nothing to export. A plugin does the reading: it runs your vault’s own command-line program on your machine, outside the box, with your sign-in. [Use a plugin](/harness-sdk/pr-cms-47/docs/user-guide/box/plugins/index.md#use-a-plugin) shows how to list one and name the item on a route, and [Plugins](https://github.com/strands-agents/box/blob/2ce2b4b9db572380184ea25e6b0de768fcb4c6c1/docs/cli/README.md#plugins) lists the ones that `box` ships. You sign in to your vault before `box run`, and the plugin’s README says how.
+If the token lives in a password manager, the box can read it for you when it starts, so there’s nothing to export. A plugin does the reading: it runs your vault’s own command-line program on your machine, outside the box, with your sign-in. [Use a plugin](/harness-sdk/pr-cms-47/docs/user-guide/box/plugins/index.md#use-a-plugin) shows how to list one and name the item on a route, and [Plugins](https://github.com/strands-agents/box/blob/1c2c9110f5bb5b9ca4c7c2eb63644ab05830aa4a/docs/cli/README.md#plugins) lists the ones that `box` ships. You sign in to your vault before `box run`, and the plugin’s README says how.
 
 ## Files and folders
 

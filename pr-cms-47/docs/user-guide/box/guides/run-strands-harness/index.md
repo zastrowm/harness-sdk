@@ -1,6 +1,6 @@
 An agent you write with the [Strands Agents SDK](https://github.com/strands-agents/sdk-python) runs in a box like any other program. In this example each of its three tools runs a command through the box’s shell, so the policy decides every command and every file a command touches. By the end of this page you have the agent working on the project from getting started, and you have watched the policy permit two tasks and refuse two, with the refusal text the agent read.
 
-Audience: an operator who has run [getting started](/harness-sdk/pr-cms-47/docs/user-guide/box/core/quickstart/index.md) and [write a policy](/harness-sdk/pr-cms-47/docs/user-guide/box/guides/write-a-policy/index.md) on a Mac. The files are in [`examples/strands-box/strands-sdk-agent`](https://github.com/strands-agents/box/blob/2ce2b4b9db572380184ea25e6b0de768fcb4c6c1/examples/strands-box/strands-sdk-agent/) in the repository, and this page walks through them.
+Audience: an operator who has run [getting started](/harness-sdk/pr-cms-47/docs/user-guide/box/core/quickstart/index.md) and [write a policy](/harness-sdk/pr-cms-47/docs/user-guide/box/guides/write-a-policy/index.md) on a Mac. The files are in [`examples/strands-box/strands-sdk-agent`](https://github.com/strands-agents/box/blob/1c2c9110f5bb5b9ca4c7c2eb63644ab05830aa4a/examples/strands-box/strands-sdk-agent/) in the repository, and this page walks through them.
 
 ## Before you start
 
@@ -348,4 +348,4 @@ A Strands Agents SDK agent that sends every tool call through the box’s shell,
 -   [Write a policy and read what it decided](/harness-sdk/pr-cms-47/docs/user-guide/box/guides/write-a-policy/index.md): each part of a rule, and the record of each decision.
 -   [Strands Shell](/harness-sdk/pr-cms-47/docs/user-guide/box/reference/shell/index.md): what the agent’s `zsh -c` runs, where, and the fields a rule reads.
 -   [Security](/harness-sdk/pr-cms-47/docs/user-guide/box/security/index.md#the-two-tiers): what `box.toml` governs, what `policy.dw` governs, and why the project stays out of the agent’s `read` list.
--   [The example directory](https://github.com/strands-agents/box/blob/2ce2b4b9db572380184ea25e6b0de768fcb4c6c1/examples/strands-box/strands-sdk-agent/): the files this page walks through.
+-   [The example directory](https://github.com/strands-agents/box/blob/1c2c9110f5bb5b9ca4c7c2eb63644ab05830aa4a/examples/strands-box/strands-sdk-agent/): the files this page walks through.

@@ -424,7 +424,7 @@ TIME (UTC)  RESULT  ACTION  RESOURCE  RULE  REASON
 
 ## box telemetry
 
-Turn usage telemetry on or off. [Usage telemetry](https://github.com/strands-agents/box/blob/2ce2b4b9db572380184ea25e6b0de768fcb4c6c1/CLI_TELEMETRY.md) says what `box` sends.
+Turn usage telemetry on or off. [Usage telemetry](https://github.com/strands-agents/box/blob/1c2c9110f5bb5b9ca4c7c2eb63644ab05830aa4a/CLI_TELEMETRY.md) says what `box` sends.
 
 ```sh
 box telemetry off
@@ -468,6 +468,7 @@ It works before you have a profile, and `box --help` tells a coding agent to run
 | --- | --- |
 | `BOX_HOME` | Use another folder in place of `~/.strands/box`, such as to try `box` with no profiles. It takes a full path, and an empty value counts as not set. Without it, `box` refuses a link at `~/.strands` or `~/.strands/box`. Only `installation.toml` and `packages/` stay in `~/.strands/box` ([Where Box keeps its files](/harness-sdk/pr-cms-47/docs/user-guide/box/reference/files/index.md)). |
 | `BOX_TELEMETRY`, `DO_NOT_TRACK` | Turn usage telemetry off for one shell, with `BOX_TELEMETRY=0` or `DO_NOT_TRACK=1`. |
+| `BOX_TEST_TELEMETRY_ENDPOINT` | Developer capture: send usage telemetry to an HTTP URL with a literal loopback address and no credentials. Invalid values, including empty or non-UTF-8 values, disable delivery. Consent still applies. See [local capture](https://github.com/strands-agents/box/blob/1c2c9110f5bb5b9ca4c7c2eb63644ab05830aa4a/docs/dev/manual-testing.md#check-telemetry-delivery). |
 | `NO_COLOR` | Turn off color in the output of `box`. |
 | `CREDSD_SOCKET` | The socket of the credentials daemon, for a `credsd://` route ([Where the box finds the daemon](/harness-sdk/pr-cms-47/docs/user-guide/box/credentials/index.md#where-the-box-finds-the-daemon)). |
 | `BOX_RESOURCES` | Use the packs, plugins, starters, policy starters, and agent guide in another folder in place of the ones that come with `box`. |

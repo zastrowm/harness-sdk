@@ -845,4 +845,4 @@ Correct the system clock, or remove the box directory to start again, as [gettin
 -   [Write a policy and read what it decided](/harness-sdk/pr-cms-47/docs/user-guide/box/guides/write-a-policy/index.md): a first policy, a denial, and the decision log.
 -   [The action vocabulary](/harness-sdk/pr-cms-47/docs/user-guide/box/reference/policy-actions/index.md): every action, its fields, and which part of the box raises it.
 -   [Security](/harness-sdk/pr-cms-47/docs/user-guide/box/security/index.md): what `box.toml` governs, what `policy.dw` governs, and what a policy cannot do today.
--   [Policy in the design guide](https://github.com/strands-agents/box/blob/2ce2b4b9db572380184ea25e6b0de768fcb4c6c1/docs/design/policy.md): how one engine per box decides, and why.
+-   [Policy in the design guide](https://github.com/strands-agents/box/blob/1c2c9110f5bb5b9ca4c7c2eb63644ab05830aa4a/docs/design/policy.md): how one engine per box decides, and why.

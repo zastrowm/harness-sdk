@@ -1287,7 +1287,7 @@ the set-group-ID and set-user-ID bits, whether native checks are enabled or disa
 </ul>
 <p>These operations are refused before a Dogwood decision or file effect.
 The workload receives an operating-system permission error; the source and destination entries remain unchanged.</p>
-<p>For native rename cases, the <a href="https://github.com/strands-agents/box/blob/2ce2b4b9db572380184ea25e6b0de768fcb4c6c1/docs/dev/linux-native-tests.md#compare-shell-and-native-policy-events">comparison suite</a>
+<p>For native rename cases, the <a href="https://github.com/strands-agents/box/blob/1c2c9110f5bb5b9ca4c7c2eb63644ab05830aa4a/docs/dev/linux-native-tests.md#compare-shell-and-native-policy-events">comparison suite</a>
 uses a test program that calls <code dir="auto">renameat</code> directly; it does not execute GNU <code dir="auto">mv</code>.
 Its permitted rename cases do not establish that GNU <code dir="auto">mv</code> works with native filesystem policy.</p>
 <p>An existing descriptor can carry later reads, writes, or directory listings without another Dogwood check.

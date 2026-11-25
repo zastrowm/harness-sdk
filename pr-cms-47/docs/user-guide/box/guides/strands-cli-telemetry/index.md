@@ -197,4 +197,4 @@ For errors from the box itself, see [If something goes wrong](/harness-sdk/pr-cm
 
 -   [Telemetry](/harness-sdk/pr-cms-47/docs/user-guide/box/guides/record-telemetry/index.md): send records to a file of your own, and what each record carries.
 -   [The `[telemetry.<label>]` table](/harness-sdk/pr-cms-47/docs/user-guide/box/reference/configuration/index.md#telemetrylabel): every key, and the exporter variables a box owns.
--   [How telemetry works](https://github.com/strands-agents/box/blob/2ce2b4b9db572380184ea25e6b0de768fcb4c6c1/docs/design/telemetry.md): which process records, what a workload cannot forge, and where a record can be lost.
+-   [How telemetry works](https://github.com/strands-agents/box/blob/1c2c9110f5bb5b9ca4c7c2eb63644ab05830aa4a/docs/design/telemetry.md): which process records, what a workload cannot forge, and where a record can be lost.

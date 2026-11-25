@@ -349,4 +349,4 @@ Set `STRANDS_BOX_TELEMETRY_DEBUG` to also print each failed export as it happens
 ## See also
 
 -   [Getting started](/harness-sdk/pr-cms-47/docs/user-guide/box/core/quickstart/index.md): install Box, then run Claude Code or Codex in a box.
--   [How telemetry works](https://github.com/strands-agents/box/blob/2ce2b4b9db572380184ea25e6b0de768fcb4c6c1/docs/design/telemetry.md): which process records, what a workload cannot forge, and where a record can be lost.
+-   [How telemetry works](https://github.com/strands-agents/box/blob/1c2c9110f5bb5b9ca4c7c2eb63644ab05830aa4a/docs/design/telemetry.md): which process records, what a workload cannot forge, and where a record can be lost.

@@ -179,8 +179,8 @@ Use the failed setup operation to identify what needs configuration:
 
 These examples record settings and results for specific Box revisions and environments:
 
--   [Amazon Linux 2023 ARM64 on Amazon EKS](https://github.com/strands-agents/box/blob/2ce2b4b9db572380184ea25e6b0de768fcb4c6c1/examples/cloud-deployments/eks/README.md#tested-configuration).
--   [Debian 12 ARM64 on Google Compute Engine](https://github.com/strands-agents/box/blob/2ce2b4b9db572380184ea25e6b0de768fcb4c6c1/examples/cloud-deployments/gcp/README.md#tested-configuration).
+-   [Amazon Linux 2023 ARM64 on Amazon EKS](https://github.com/strands-agents/box/blob/1c2c9110f5bb5b9ca4c7c2eb63644ab05830aa4a/examples/cloud-deployments/eks/README.md#tested-configuration).
+-   [Debian 12 ARM64 on Google Compute Engine](https://github.com/strands-agents/box/blob/1c2c9110f5bb5b9ca4c7c2eb63644ab05830aa4a/examples/cloud-deployments/gcp/README.md#tested-configuration).
 
 Each record identifies the configuration and checks that passed. Repeat the checks for your Box build and deployment.
 

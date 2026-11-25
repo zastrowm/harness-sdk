@@ -280,6 +280,6 @@ For a request the policy refuses, see [troubleshooting](/harness-sdk/pr-cms-47/d
 ## See also
 
 -   [Write policy for an MCP server](/harness-sdk/pr-cms-47/docs/user-guide/box/guides/write-mcp-policy/index.md): the rules that let the agent start, list, and call a server, and how to connect the harness.
--   [MCP servers in the design guide](https://github.com/strands-agents/box/blob/2ce2b4b9db572380184ea25e6b0de768fcb4c6c1/docs/design/mcp.md): how the box starts a server and decides each call.
--   [Local MCP servers in the design guide](https://github.com/strands-agents/box/blob/2ce2b4b9db572380184ea25e6b0de768fcb4c6c1/docs/design/containment.md#local-mcp-servers): what a stdio server’s sandbox reaches.
--   [macOS network restrictions](https://github.com/strands-agents/box/blob/2ce2b4b9db572380184ea25e6b0de768fcb4c6c1/docs/design/macos-enforcement.md#network-connections-and-local-services): how the sandbox limits a server’s connections.
+-   [MCP servers in the design guide](https://github.com/strands-agents/box/blob/1c2c9110f5bb5b9ca4c7c2eb63644ab05830aa4a/docs/design/mcp.md): how the box starts a server and decides each call.
+-   [Local MCP servers in the design guide](https://github.com/strands-agents/box/blob/1c2c9110f5bb5b9ca4c7c2eb63644ab05830aa4a/docs/design/containment.md#local-mcp-servers): what a stdio server’s sandbox reaches.
+-   [macOS network restrictions](https://github.com/strands-agents/box/blob/1c2c9110f5bb5b9ca4c7c2eb63644ab05830aa4a/docs/design/macos-enforcement.md#network-connections-and-local-services): how the sandbox limits a server’s connections.

@@ -1,6 +1,6 @@
 Use this page when `box` stops with an error, or when the agent can’t do something in the box. Most messages that start with `box: error:` name their own fix, so this page covers the ones that don’t, and the failures that show up after the box starts. Search the page for a few words of your message. The examples use `/Users/you` for your home folder.
 
-This page covers what every [pack](https://github.com/strands-agents/box/blob/2ce2b4b9db572380184ea25e6b0de768fcb4c6c1/docs/cli/README.md#packs) and [plugin](https://github.com/strands-agents/box/blob/2ce2b4b9db572380184ea25e6b0de768fcb4c6c1/docs/cli/README.md#plugins) can hit, such as `@box/claude`, which runs Claude Code. An error that only one pack or plugin prints, and its fix, is in the **Troubleshooting** section of its README, and its own limits are in its **Limitations** section.
+This page covers what every [pack](https://github.com/strands-agents/box/blob/1c2c9110f5bb5b9ca4c7c2eb63644ab05830aa4a/docs/cli/README.md#packs) and [plugin](https://github.com/strands-agents/box/blob/1c2c9110f5bb5b9ca4c7c2eb63644ab05830aa4a/docs/cli/README.md#plugins) can hit, such as `@box/claude`, which runs Claude Code. An error that only one pack or plugin prints, and its fix, is in the **Troubleshooting** section of its README, and its own limits are in its **Limitations** section.
 
 ## Before the box starts
 

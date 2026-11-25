@@ -233,7 +233,7 @@ A name changes only which file runs. The spawn still needs a `shell:spawn` permi
 
 ## `curl`
 
-`curl` sends each request through the egress gateway, which decides `net:connect` and `http:request` ([how Box controls outbound traffic](https://github.com/strands-agents/box/blob/2ce2b4b9db572380184ea25e6b0de768fcb4c6c1/docs/design/egress.md)). A request the gateway refuses makes `curl` exit `1` and print the reason, even with `-s`. A request the gateway doesn’t refuse but can’t complete makes `curl` exit `6` and print `curl: (6)` and the reason, unless `-s` hides errors.
+`curl` sends each request through the egress gateway, which decides `net:connect` and `http:request` ([how Box controls outbound traffic](https://github.com/strands-agents/box/blob/1c2c9110f5bb5b9ca4c7c2eb63644ab05830aa4a/docs/design/egress.md)). A request the gateway refuses makes `curl` exit `1` and print the reason, even with `-s`. A request the gateway doesn’t refuse but can’t complete makes `curl` exit `6` and print `curl: (6)` and the reason, unless `-s` hides errors.
 
 A response body is at most [`limits.shell.max_output`](/harness-sdk/pr-cms-47/docs/user-guide/box/reference/configuration/index.md#limits) bytes, 1 MiB by default. Past it, `curl` exits with status `6`, writes none of the body, and prints `curl: (6) response body too large` unless `-s` hides errors. The request was already sent, so its effect at the server stays.
 
@@ -265,6 +265,6 @@ A response body is at most [`limits.shell.max_output`](/harness-sdk/pr-cms-47/do
 ## See also
 
 -   [Write policy for shell commands](/harness-sdk/pr-cms-47/docs/user-guide/box/guides/write-shell-policy/index.md): rules for commands, programs, and paths.
--   [How Box runs shell commands and programs](https://github.com/strands-agents/box/blob/2ce2b4b9db572380184ea25e6b0de768fcb4c6c1/docs/design/shell.md): how the Shell decides each command, and the order of the checks.
--   [A tool’s sandbox](https://github.com/strands-agents/box/blob/2ce2b4b9db572380184ea25e6b0de768fcb4c6c1/docs/design/containment.md#a-tools-leaf-box): what a tool such as `git` can reach.
+-   [How Box runs shell commands and programs](https://github.com/strands-agents/box/blob/1c2c9110f5bb5b9ca4c7c2eb63644ab05830aa4a/docs/design/shell.md): how the Shell decides each command, and the order of the checks.
+-   [A tool’s sandbox](https://github.com/strands-agents/box/blob/1c2c9110f5bb5b9ca4c7c2eb63644ab05830aa4a/docs/design/containment.md#a-tools-leaf-box): what a tool such as `git` can reach.
 -   [The `[egress.<name>]` table](/harness-sdk/pr-cms-47/docs/user-guide/box/guides/network-and-credentials/index.md): credentials for the requests `curl` sends.

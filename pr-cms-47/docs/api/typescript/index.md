@@ -224,7 +224,6 @@
     -   [ModelContentBlockDeltaEventData](/harness-sdk/pr-cms-47/docs/api/typescript/ModelContentBlockDeltaEventData/index.md)
     -   [ModelContentBlockStartEventData](/harness-sdk/pr-cms-47/docs/api/typescript/ModelContentBlockStartEventData/index.md)
     -   [ModelExtractorOptions](/harness-sdk/pr-cms-47/docs/api/typescript/ModelExtractorOptions/index.md)
-    -   [ModelInfo](/harness-sdk/pr-cms-47/docs/api/typescript/ModelInfo/index.md)
     -   [ModelLimits](/harness-sdk/pr-cms-47/docs/api/typescript/ModelLimits/index.md)
     -   [ModelMessageStartEventData](/harness-sdk/pr-cms-47/docs/api/typescript/ModelMessageStartEventData/index.md)
     -   [ModelMessageStopEventData](/harness-sdk/pr-cms-47/docs/api/typescript/ModelMessageStopEventData/index.md)
