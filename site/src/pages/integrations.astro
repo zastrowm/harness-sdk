@@ -103,6 +103,15 @@ const sidebar = [
         hasNew={hasNew}
       />
     </div>
+    {/* With filters in the URL (a Back or reload to a search), hide the grid and
+        count until the page script has filtered them, so the full grid doesn't
+        flash first. apply() clears the flag; the timeout covers a failed script. */}
+    <script is:inline>
+      if (/[?&](q|type|lang|badge|by|sdk)=/.test(location.search)) {
+        document.documentElement.dataset.catPending = ''
+        setTimeout(() => delete document.documentElement.dataset.catPending, 3000)
+      }
+    </script>
     <div class="cat-grid" data-cat-grid>
       {cards.map((card) => <CatalogCard card={card} />)}
       {/* Not a .cat-card: the filter script must never hide this tile. */}
@@ -184,6 +193,7 @@ const sidebar = [
     }
     if (emptyEl) emptyEl.hidden = visible > 0
     if (countEl) countEl.textContent = String(visible)
+    delete document.documentElement.dataset.catPending
 
     // Reflect the active type onto the left sidebar (single-select browse).
     // Starlight marks every /integrations link current by pathname, so clear

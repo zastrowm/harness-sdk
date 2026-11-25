@@ -576,3 +576,9 @@ body:has(.cat-page) {
     transition: none;
   }
 }
+
+/* Filters in the URL: hide the unfiltered grid and count until the page script
+   applies them (see the inline script above the grid in integrations.astro). */
+html[data-cat-pending] :is(.cat-grid, [data-cat-count]) {
+  visibility: hidden;
+}
