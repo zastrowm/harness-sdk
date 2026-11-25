@@ -1,0 +1,66 @@
+Defined in: [src/memory/types.ts:200](https://github.com/strands-agents/harness-sdk/blob/main/strands-ts/src/memory/types.ts#L200)
+
+Configuration for the `add_memory` tool. Extends [MemoryToolConfig](/harness-sdk/pr-cms-48/docs/api/typescript/MemoryToolConfig/index.md) with an explicit allowlist of stores the tool may write to.
+
+## Extends
+
+-   [`MemoryToolConfig`](/harness-sdk/pr-cms-48/docs/api/typescript/MemoryToolConfig/index.md)
+
+## Properties
+
+### name?
+
+```ts
+name?: string;
+```
+
+Defined in: [src/memory/types.ts:191](https://github.com/strands-agents/harness-sdk/blob/main/strands-ts/src/memory/types.ts#L191)
+
+Custom tool name.
+
+#### Inherited from
+
+[`MemoryToolConfig`](/harness-sdk/pr-cms-48/docs/api/typescript/MemoryToolConfig/index.md).[`name`](/harness-sdk/pr-cms-48/docs/api/typescript/MemoryToolConfig/index.md#name)
+
+---
+
+### description?
+
+```ts
+description?: string;
+```
+
+Defined in: [src/memory/types.ts:193](https://github.com/strands-agents/harness-sdk/blob/main/strands-ts/src/memory/types.ts#L193)
+
+Custom tool description.
+
+#### Inherited from
+
+[`MemoryToolConfig`](/harness-sdk/pr-cms-48/docs/api/typescript/MemoryToolConfig/index.md).[`description`](/harness-sdk/pr-cms-48/docs/api/typescript/MemoryToolConfig/index.md#description)
+
+---
+
+### stores?
+
+```ts
+stores?: (string | MemoryStore)[];
+```
+
+Defined in: [src/memory/types.ts:206](https://github.com/strands-agents/harness-sdk/blob/main/strands-ts/src/memory/types.ts#L206)
+
+The writable stores the `add_memory` tool may write to, given as store names or the [MemoryStore](/harness-sdk/pr-cms-48/docs/api/typescript/MemoryStore/index.md) instances themselves. Each must be a configured, `writable` store. Omit (or set `addToolConfig: true`) to allow all writable stores.
+
+---
+
+### waitForWrites?
+
+```ts
+waitForWrites?: boolean;
+```
+
+Defined in: [src/memory/types.ts:214](https://github.com/strands-agents/harness-sdk/blob/main/strands-ts/src/memory/types.ts#L214)
+
+Whether the tool waits for store writes before returning to the model. Defaults to `true`.
+
+-   `true` (default): waits for writes — the tool returns `{ stored }` on success, or surfaces a failure to the model if any store write fails.
+-   `false`: fire-and-forget — the tool returns `{ accepted }` once writes are dispatched (so a slow backend never blocks the agent loop); per-store failures are logged.

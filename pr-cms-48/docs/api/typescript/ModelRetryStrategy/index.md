@@ -1,0 +1,124 @@
+Defined in: [src/retry/model-retry-strategy.ts:33](https://github.com/strands-agents/harness-sdk/blob/main/strands-ts/src/retry/model-retry-strategy.ts#L33)
+
+Abstract base class for model-retry strategies.
+
+A ModelRetryStrategy is a [Plugin](/harness-sdk/pr-cms-48/docs/api/typescript/Plugin/index.md) that retries failed model calls. Subclasses implement [computeRetryDecision](#computeretrydecision) to answer *whether* to retry and *how long* to wait; the base class orchestrates the rest:
+
+1.  Short-circuits if another hook already set `event.retry` (no stacked delay).
+2.  Short-circuits on success events (`event.error === undefined`).
+3.  Calls [onFirstModelAttempt](#onfirstmodelattempt) when a fresh retry budget starts (`event.attemptCount === 1`), letting stateful subclasses clear per-budget state.
+4.  Invokes [computeRetryDecision](#computeretrydecision); on `retry: true`, sleeps for `waitMs` then sets `event.retry = true`.
+
+Other retry kinds (e.g. tool retries) will land as *sibling* abstract classes, not as additional methods on this one — different retry kinds have different unit-of-work boundaries and don’t share a single state contract.
+
+Single-agent attachment: instances typically carry per-budget state, so sharing one instance across agents would let their calls trample each other. The base class throws on attempts to attach to a different agent.
+
+## Extended by
+
+-   [`DefaultModelRetryStrategy`](/harness-sdk/pr-cms-48/docs/api/typescript/DefaultModelRetryStrategy/index.md)
+
+## Implements
+
+-   [`Plugin`](/harness-sdk/pr-cms-48/docs/api/typescript/Plugin/index.md)
+
+## Constructors
+
+### Constructor
+
+```ts
+new ModelRetryStrategy(): ModelRetryStrategy;
+```
+
+#### Returns
+
+`ModelRetryStrategy`
+
+## Properties
+
+### name
+
+```ts
+abstract readonly name: string;
+```
+
+Defined in: [src/retry/model-retry-strategy.ts:37](https://github.com/strands-agents/harness-sdk/blob/main/strands-ts/src/retry/model-retry-strategy.ts#L37)
+
+A stable string identifier for this retry strategy.
+
+#### Implementation of
+
+[`Plugin`](/harness-sdk/pr-cms-48/docs/api/typescript/Plugin/index.md).[`name`](/harness-sdk/pr-cms-48/docs/api/typescript/Plugin/index.md#name)
+
+## Methods
+
+### computeRetryDecision()
+
+```ts
+abstract protected computeRetryDecision(event):
+  | RetryDecision
+| Promise<RetryDecision>;
+```
+
+Defined in: [src/retry/model-retry-strategy.ts:53](https://github.com/strands-agents/harness-sdk/blob/main/strands-ts/src/retry/model-retry-strategy.ts#L53)
+
+Decide whether to retry the failed model call, and how long to wait first.
+
+Called only for error events that have not already been marked for retry by another hook. The base class has already filtered out successes and short-circuited events where `event.retry` is true, so implementations only need to reason about `event.error`.
+
+Return `{ retry: false }` to let the error propagate. Return `{ retry: true, waitMs }` to retry after sleeping for `waitMs` milliseconds.
+
+#### Parameters
+
+| Parameter | Type |
+| --- | --- |
+| `event` | [`AfterModelCallEvent`](/harness-sdk/pr-cms-48/docs/api/typescript/AfterModelCallEvent/index.md) |
+
+#### Returns
+
+| [`RetryDecision`](/harness-sdk/pr-cms-48/docs/api/typescript/RetryDecision/index.md) | `Promise`<[`RetryDecision`](/harness-sdk/pr-cms-48/docs/api/typescript/RetryDecision/index.md)\>
+
+---
+
+### onFirstModelAttempt()
+
+```ts
+protected onFirstModelAttempt(): void;
+```
+
+Defined in: [src/retry/model-retry-strategy.ts:60](https://github.com/strands-agents/harness-sdk/blob/main/strands-ts/src/retry/model-retry-strategy.ts#L60)
+
+Called when `event.attemptCount === 1`, at the start of a fresh retry budget. This occurs on a new turn and when model routing switches candidates. Subclasses with per-budget state override this to clear it; the default is a no-op.
+
+#### Returns
+
+`void`
+
+---
+
+### initAgent()
+
+```ts
+initAgent(agent): void;
+```
+
+Defined in: [src/retry/model-retry-strategy.ts:95](https://github.com/strands-agents/harness-sdk/blob/main/strands-ts/src/retry/model-retry-strategy.ts#L95)
+
+Initialize the retry strategy with the agent instance.
+
+Enforces the single-agent attachment guard and registers the [AfterModelCallEvent](/harness-sdk/pr-cms-48/docs/api/typescript/AfterModelCallEvent/index.md) hook that drives retry orchestration.
+
+Subclasses that override this method MUST call `super.initAgent(agent)` to preserve the attachment guard and hook registration. Additional hooks may be registered after the `super` call.
+
+#### Parameters
+
+| Parameter | Type | Description |
+| --- | --- | --- |
+| `agent` | `LocalAgent` | The agent to register hooks with |
+
+#### Returns
+
+`void`
+
+#### Implementation of
+
+[`Plugin`](/harness-sdk/pr-cms-48/docs/api/typescript/Plugin/index.md).[`initAgent`](/harness-sdk/pr-cms-48/docs/api/typescript/Plugin/index.md#initagent)

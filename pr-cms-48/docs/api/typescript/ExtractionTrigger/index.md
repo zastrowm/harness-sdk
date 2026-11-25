@@ -1,0 +1,60 @@
+Defined in: [src/memory/extraction/types.ts:112](https://github.com/strands-agents/harness-sdk/blob/main/strands-ts/src/memory/extraction/types.ts#L112)
+
+Controls when a store’s [ExtractionConfig](/harness-sdk/pr-cms-48/docs/api/typescript/ExtractionConfig/index.md) runs.
+
+A trigger is a self-attaching value object: [attach](#attach) wires whatever agent hooks the trigger needs and calls [ExtractionTriggerContext.fire](/harness-sdk/pr-cms-48/docs/api/typescript/ExtractionTriggerContext/index.md#fire) when extraction should happen. Extend this class for custom triggering logic.
+
+A trigger must eventually fire for its store’s buffered messages to be written: the high-water-mark dedup means skipped turns are still picked up on the *next* fire, but a trigger that never fires never extracts (and its messages stay buffered for the session). For a guaranteed final write at a boundary, the caller uses [MemoryManager.flush](/harness-sdk/pr-cms-48/docs/api/typescript/MemoryManager/index.md#flush), which force-completes regardless of triggers.
+
+## Extended by
+
+-   [`InvocationTrigger`](/harness-sdk/pr-cms-48/docs/api/typescript/InvocationTrigger/index.md)
+-   [`IntervalTrigger`](/harness-sdk/pr-cms-48/docs/api/typescript/IntervalTrigger/index.md)
+
+## Constructors
+
+### Constructor
+
+```ts
+new ExtractionTrigger(): ExtractionTrigger;
+```
+
+#### Returns
+
+`ExtractionTrigger`
+
+## Properties
+
+### name
+
+```ts
+abstract readonly name: string;
+```
+
+Defined in: [src/memory/extraction/types.ts:114](https://github.com/strands-agents/harness-sdk/blob/main/strands-ts/src/memory/extraction/types.ts#L114)
+
+Stable identifier for this trigger kind, used in logging.
+
+## Methods
+
+### attach()
+
+```ts
+abstract attach(context): void;
+```
+
+Defined in: [src/memory/extraction/types.ts:124](https://github.com/strands-agents/harness-sdk/blob/main/strands-ts/src/memory/extraction/types.ts#L124)
+
+Wire this trigger into the agent lifecycle.
+
+Called once per store during [MemoryManager](/harness-sdk/pr-cms-48/docs/api/typescript/MemoryManager/index.md) initialization. Register hooks on `context.agent` and call `context.fire()` when extraction should run.
+
+#### Parameters
+
+| Parameter | Type | Description |
+| --- | --- | --- |
+| `context` | [`ExtractionTriggerContext`](/harness-sdk/pr-cms-48/docs/api/typescript/ExtractionTriggerContext/index.md) | The agent to attach to and the fire callback bound to this trigger’s store |
+
+#### Returns
+
+`void`

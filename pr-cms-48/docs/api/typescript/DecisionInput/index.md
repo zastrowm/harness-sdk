@@ -1,0 +1,12 @@
+```ts
+type DecisionInput =
+  | string
+  | ContentBlock[]
+  | Message[];
+```
+
+Defined in: [src/decisions/types.ts:16](https://github.com/strands-agents/harness-sdk/blob/main/strands-ts/src/decisions/types.ts#L16)
+
+Input state passed to a [DecisionModel](/harness-sdk/pr-cms-48/docs/api/typescript/DecisionModel/index.md) invocation.
+
+The subset of [InvokeArgs](/harness-sdk/pr-cms-48/docs/api/typescript/InvokeArgs/index.md) that fits a stateless decision: a plain string question, a single-turn content list (multimodal), or a full message history.

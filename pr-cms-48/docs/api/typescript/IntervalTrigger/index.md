@@ -1,0 +1,83 @@
+Defined in: [src/memory/extraction/triggers.ts:47](https://github.com/strands-agents/harness-sdk/blob/main/strands-ts/src/memory/extraction/triggers.ts#L47)
+
+Runs extraction every N agent invocations.
+
+A controllable middle ground: extraction (and any model call it entails) happens on a cadence rather than every turn, while the high-water mark guarantees the messages from the skipped turns are still processed when the trigger does fire.
+
+## Example
+
+```typescript
+extraction: { trigger: [new IntervalTrigger({ turns: 5 })] }
+```
+
+## Extends
+
+-   [`ExtractionTrigger`](/harness-sdk/pr-cms-48/docs/api/typescript/ExtractionTrigger/index.md)
+
+## Constructors
+
+### Constructor
+
+```ts
+new IntervalTrigger(options): IntervalTrigger;
+```
+
+Defined in: [src/memory/extraction/triggers.ts:51](https://github.com/strands-agents/harness-sdk/blob/main/strands-ts/src/memory/extraction/triggers.ts#L51)
+
+#### Parameters
+
+| Parameter | Type |
+| --- | --- |
+| `options` | [`IntervalTriggerOptions`](/harness-sdk/pr-cms-48/docs/api/typescript/IntervalTriggerOptions/index.md) |
+
+#### Returns
+
+`IntervalTrigger`
+
+#### Overrides
+
+[`ExtractionTrigger`](/harness-sdk/pr-cms-48/docs/api/typescript/ExtractionTrigger/index.md).[`constructor`](/harness-sdk/pr-cms-48/docs/api/typescript/ExtractionTrigger/index.md#constructor)
+
+## Properties
+
+### name
+
+```ts
+readonly name: "interval" = 'interval';
+```
+
+Defined in: [src/memory/extraction/triggers.ts:48](https://github.com/strands-agents/harness-sdk/blob/main/strands-ts/src/memory/extraction/triggers.ts#L48)
+
+Stable identifier for this trigger kind, used in logging.
+
+#### Overrides
+
+[`ExtractionTrigger`](/harness-sdk/pr-cms-48/docs/api/typescript/ExtractionTrigger/index.md).[`name`](/harness-sdk/pr-cms-48/docs/api/typescript/ExtractionTrigger/index.md#name)
+
+## Methods
+
+### attach()
+
+```ts
+attach(context): void;
+```
+
+Defined in: [src/memory/extraction/triggers.ts:59](https://github.com/strands-agents/harness-sdk/blob/main/strands-ts/src/memory/extraction/triggers.ts#L59)
+
+Wire this trigger into the agent lifecycle.
+
+Called once per store during [MemoryManager](/harness-sdk/pr-cms-48/docs/api/typescript/MemoryManager/index.md) initialization. Register hooks on `context.agent` and call `context.fire()` when extraction should run.
+
+#### Parameters
+
+| Parameter | Type | Description |
+| --- | --- | --- |
+| `context` | [`ExtractionTriggerContext`](/harness-sdk/pr-cms-48/docs/api/typescript/ExtractionTriggerContext/index.md) | The agent to attach to and the fire callback bound to this trigger’s store |
+
+#### Returns
+
+`void`
+
+#### Overrides
+
+[`ExtractionTrigger`](/harness-sdk/pr-cms-48/docs/api/typescript/ExtractionTrigger/index.md).[`attach`](/harness-sdk/pr-cms-48/docs/api/typescript/ExtractionTrigger/index.md#attach)

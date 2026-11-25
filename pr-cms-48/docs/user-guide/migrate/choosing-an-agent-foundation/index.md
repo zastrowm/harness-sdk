@@ -1,0 +1,113 @@
+You are about to build an agent, and the first decision is not which model to call. It is what your agent runs on: a framework, or a loop you write and own yourself. This page is for developers making that call, and for teams whose hand-written prototype is starting to sprout the same machinery every agent eventually needs. It compares Strands against the most common alternatives and says plainly when a framework earns its place and when it does not.
+
+If you already know you want a framework and just want to build, skip to the [Python quickstart](/harness-sdk/pr-cms-48/docs/user-guide/sdk/quickstart/python/index.md) or the [TypeScript quickstart](/harness-sdk/pr-cms-48/docs/user-guide/sdk/quickstart/typescript/index.md).
+
+## Framework or your own loop?
+
+Almost every agent starts as a `while` loop. You call the model, check whether it asked for a tool, run the tool, feed the result back, and repeat until the model stops asking. This is the right way to begin. The loop is a few dozen lines, you understand every one of them, and you depend on nothing but the model provider’s client library.
+
+The loop stays small only while its job stays small. The moment real requirements arrive, the same code grows the same limbs every time. You need to stop a runaway agent, so you add a turn counter and a token tally. You need to kill an invocation when the user closes the tab, so you thread a cancellation signal through every await point. You add structured output, then retries around malformed output. A second model provider arrives and your tidy loop forks around two client APIs. Someone asks for traces, so you wire in OpenTelemetry by hand. Then a second agent, and now you are writing routing and handoff logic that is itself an agent loop.
+
+None of these are hard in isolation. The cost is that you are now maintaining a framework you did not set out to write, spread across your loop as ad hoc additions rather than designed as a system. A framework is the decision to get those jobs through one interface, tested and documented, instead of accreting them yourself.
+
+So the real question is not “framework or not” in the abstract. It is: **how many of the jobs below does your agent already need, and how many will it need soon?**
+
+## What each option gives you
+
+The columns are the realistic choices for a new agent: Strands, a hand-written loop, and four other frameworks. The rows are the ten jobs a production agent tends to accumulate. Each cell is marked **Built-in** when the option ships the capability as a first-class API, **Partial** when it comes through a companion product, adapter, or limited support, and **DIY** when you write and own it yourself, with the specifics named alongside.
+
+Built-inPartial / via add-onDIY
+
+| Job | Strands | Hand-written loop | OpenAI Agents SDK | LangGraph | Vercel AI SDK | Pydantic AI |
+| --- | --- | --- | --- | --- | --- | --- |
+| Loop controlsturn/token limits, cancellation, stop reasons | Built-in | DIY | Turn cap; cancel via abort | Recursion cap; budgets DIY | Step cap + abort | Usage limits (turns/tokens) |
+| Tools & structured output | Built-in | DIY | Built-in | Via LangChain | Built-in | Built-in |
+| MCP | Built-in client | DIY | Built-in | Via adapter | Experimental | Built-in |
+| Multi-agent | Graph, swarm, agents as tools | DIY | Handoffs, agents as tools | Built-in (graphs) | DIY | Delegation; graph library |
+| Memory & sessions | Built-in | DIY | Sessions | Checkpointers | DIY | Message history (DIY) |
+| Model providersportability | Built-in (many) | Per provider | OpenAI-first; others via LiteLLM | Via LangChain | Built-in (many) | Built-in (many) |
+| Streaming | Built-in | DIY | Built-in | Built-in | Built-in | Built-in |
+| Guardrails / interventions | Built-in | DIY | Built-in | DIY (nodes) | DIY | Output validators |
+| Tracing / observability | OpenTelemetry-native | DIY | Built-in tracing | Via LangSmith | OpenTelemetry | Via Logfire (OTel) |
+| Evaluation | Companion Evals SDK | DIY | Via OpenAI platform | Via LangSmith | Third-party | pydantic-evals |
+
+A few honest caveats about reading this table. Every framework in it is capable, actively developed, and a reasonable choice for the right project, so treat the cells as a starting map, not a scoreboard. “DIY” is not a criticism: a job you do not have is a job you should not pay a dependency for. And the competitor columns describe documented capabilities as of writing; these libraries move quickly, so verify against their current docs before committing. Strands leans toward built-in across the row because its bet is that most agents eventually need most of these, and that one coherent interface beats ten bolted-on ones. That bet is wrong for some agents. The next section is about those.
+
+## When to keep your own loop
+
+Keep the loop you wrote when your agent is small and intends to stay that way. Concretely, a hand-written loop is the better call when most of these hold:
+
+-   **One model, one provider.** You have no portability requirement and no plan to add one. A framework’s provider abstraction is overhead you will never cash in.
+-   **A handful of tools and a single agent.** No routing, no handoffs, no sub-agents. The orchestration a multi-agent framework offers has nothing to orchestrate.
+-   **Short, one-shot, or tightly-scoped runs.** A classifier, an extraction step, a single well-bounded task. If runs cannot go long or loop unexpectedly, the turn budgets and cancellation machinery buy you little.
+-   **Minimal dependencies matter more than features.** A library, an edge function, or a constrained runtime where every added dependency is a real cost, and you would rather own fifty lines than inherit a framework’s surface area.
+-   **You want full control of the loop’s shape.** You are researching a novel control flow the frameworks do not model, and their abstractions would fight you rather than help.
+
+The trap is not choosing a loop. The trap is choosing a loop, then quietly rebuilding a framework inside it one requirement at a time, until you own a worse version of the thing you avoided, with none of the tests or docs. When you catch yourself writing the second token counter or the second provider adapter, that is the signal to reconsider, not a reason to keep going.
+
+## Choose your migration path
+
+Your starting point determines what should stay stable during the move. Keep the application boundary that callers already use, such as a function, route, event handler, or job, and replace the implementation behind it. This gives you one place to compare behavior and one switch to roll back if the new path is not ready.
+
+### From a direct model call
+
+Keep a direct model call when it performs one bounded task and does not need tools, multi-step work, or session management. It has no agent loop to migrate, and adding a framework would only add surface area.
+
+When that call needs to become an agent:
+
+1.  Keep the existing input and output contract. Carry over the model ID and provider settings to the chosen [model provider](/harness-sdk/pr-cms-48/docs/user-guide/sdk/model-providers/index.md), and move the existing instructions to the agent’s system prompt.
+2.  Put a Strands `Agent` behind the same application boundary, then adapt its result to the response shape your callers already expect.
+3.  Compare representative requests before switching callers. Model wording varies, so compare the required structure, safety behavior, and domain facts rather than exact text.
+4.  Add [tools](/harness-sdk/pr-cms-48/docs/user-guide/sdk/tools/custom-tools/index.md), [structured output](/harness-sdk/pr-cms-48/docs/user-guide/sdk/agents/structured-output/index.md), or [session management](/harness-sdk/pr-cms-48/docs/user-guide/sdk/agents/session-management/index.md) only when the use case needs them. Do not add agent features solely to complete the migration.
+
+### From a custom agent loop
+
+Move a custom agent loop to Strands one responsibility at a time. The loop already owns the work that Strands will take over, and a staged cutover keeps failures pointing to a small part of the move:
+
+1.  Record the current contract with representative prompts, tool calls, failure cases, and externally visible side effects.
+2.  Configure the same model provider and instructions on an `Agent`, while keeping the caller-facing function or route unchanged.
+3.  Register the existing tool implementations as Strands tools. Preserve their names, descriptions, input schemas, and side-effect boundaries until the new path matches the old one.
+4.  Replace the manual call-tool-append `while` loop with an agent invocation. The [agent loop](/harness-sdk/pr-cms-48/docs/user-guide/sdk/agents/agent-loop/index.md) manages tool calling and conversation history within the invocation.
+5.  Move operational controls last: counters become [invocation limits](/harness-sdk/pr-cms-48/docs/user-guide/sdk/agents/agent-loop/index.md#invocation-limits), request aborts become [cancellation](/harness-sdk/pr-cms-48/docs/user-guide/sdk/agents/agent-loop/index.md#cancellation), durable conversations use [session management](/harness-sdk/pr-cms-48/docs/user-guide/sdk/agents/session-management/index.md), and traces use [observability](/harness-sdk/pr-cms-48/docs/user-guide/sdk/observability-evaluation/observability/index.md).
+
+Run both paths against the recorded cases before removing the custom loop. The [OpenAI migration guide](/harness-sdk/pr-cms-48/docs/user-guide/migrate/openai/index.md#from-a-hand-written-openai-loop) shows this sequence with a complete before-and-after example.
+
+### From an existing agent framework
+
+Move from an existing framework by mapping concepts instead of classes. Start with the smallest workflow that represents real production behavior, and keep its public entry point and caller-facing identifiers stable.
+
+| Existing responsibility | Strands destination |
+| --- | --- |
+| Model client or model selection | [Model providers](/harness-sdk/pr-cms-48/docs/user-guide/sdk/model-providers/index.md) |
+| Agent instructions | The `Agent` system prompt |
+| Tool definitions and dispatch | [Tools](/harness-sdk/pr-cms-48/docs/user-guide/sdk/tools/custom-tools/index.md) and [MCP tools](/harness-sdk/pr-cms-48/docs/user-guide/sdk/tools/mcp-tools/index.md) |
+| Runner or executor | The [agent loop](/harness-sdk/pr-cms-48/docs/user-guide/sdk/agents/agent-loop/index.md) and [streaming](/harness-sdk/pr-cms-48/docs/user-guide/sdk/streaming/index.md) |
+| Conversation persistence | [Session management](/harness-sdk/pr-cms-48/docs/user-guide/sdk/agents/session-management/index.md) |
+| Durable knowledge across sessions | [Memory](/harness-sdk/pr-cms-48/docs/user-guide/sdk/memory/overview/index.md) |
+| Handoffs or graph routing | [Multi-agent patterns](/harness-sdk/pr-cms-48/docs/user-guide/sdk/multi-agent/multi-agent-patterns/index.md) |
+| Guardrails | [Interventions](/harness-sdk/pr-cms-48/docs/user-guide/sdk/agents/interventions/index.md) |
+| Lifecycle extensions and traces | [Hooks](/harness-sdk/pr-cms-48/docs/user-guide/sdk/agents/hooks/index.md) and [observability](/harness-sdk/pr-cms-48/docs/user-guide/sdk/observability-evaluation/observability/index.md) |
+
+After mapping the concepts, run the old and new implementations against the same cases. Compare tool side effects, stop conditions, persisted state, and output contracts. Do not require identical model wording. Switch one workflow at a time, and keep the old route available until the new one has handled production traffic.
+
+For the OpenAI Agents SDK, follow the [OpenAI migration guide](/harness-sdk/pr-cms-48/docs/user-guide/migrate/openai/index.md#from-the-openai-agents-sdk) for a concrete concept map and end-to-end example.
+
+## Where Strands fits, and how to start
+
+Reach for Strands (or another framework) when your loop has grown to need several of these jobs at once and you want them through one interface, with the freedom to change models without rewriting the agent. That is the case Strands is built for: [invocation limits](/harness-sdk/pr-cms-48/docs/user-guide/sdk/agents/agent-loop/index.md#invocation-limits), typed [stop reasons](/harness-sdk/pr-cms-48/docs/user-guide/sdk/agents/agent-loop/index.md), and cancellation come with the [agent loop](/harness-sdk/pr-cms-48/docs/user-guide/sdk/agents/agent-loop/index.md); [tools](/harness-sdk/pr-cms-48/docs/user-guide/sdk/tools/custom-tools/index.md) and [structured output](/harness-sdk/pr-cms-48/docs/user-guide/sdk/agents/structured-output/index.md), an [MCP client](/harness-sdk/pr-cms-48/docs/user-guide/sdk/tools/mcp-tools/index.md), [multi-agent](/harness-sdk/pr-cms-48/docs/user-guide/sdk/multi-agent/graph/index.md) patterns ([swarm](/harness-sdk/pr-cms-48/docs/user-guide/sdk/multi-agent/swarm/index.md), [agents as tools](/harness-sdk/pr-cms-48/docs/user-guide/sdk/multi-agent/agents-as-tools/index.md)), [session management](/harness-sdk/pr-cms-48/docs/user-guide/sdk/agents/session-management/index.md) with [snapshots](/harness-sdk/pr-cms-48/docs/user-guide/sdk/agents/snapshots/index.md), [streaming](/harness-sdk/pr-cms-48/docs/user-guide/sdk/streaming/index.md), [guardrails and interventions](/harness-sdk/pr-cms-48/docs/user-guide/sdk/agents/interventions/index.md), [OpenTelemetry-native observability](/harness-sdk/pr-cms-48/docs/user-guide/sdk/observability-evaluation/observability/index.md), and a companion [Evals SDK](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/index.md) all sit behind the same agent.
+
+What Strands deliberately does not add is a platform. It runs in your own process as a library, with no hosted control plane, scheduler, or database to stand up first. The same agent code runs against Amazon Bedrock, Anthropic, OpenAI, Google, Ollama, or [other providers](/harness-sdk/pr-cms-48/docs/user-guide/sdk/model-providers/index.md), so model portability does not cost you a rewrite.
+
+Choose the migration path that matches your current foundation. For a new agent, start with the [Python quickstart](/harness-sdk/pr-cms-48/docs/user-guide/sdk/quickstart/python/index.md) or the [TypeScript quickstart](/harness-sdk/pr-cms-48/docs/user-guide/sdk/quickstart/typescript/index.md), then add the jobs above as you need them, not before.
+
+## Related pages
+
+- [Get started](/harness-sdk/pr-cms-48/docs/user-guide/sdk/quickstart/overview/index.md) (1 shared tag)
+- [Python Quickstart](/harness-sdk/pr-cms-48/docs/user-guide/sdk/quickstart/python/index.md) (1 shared tag)
+- [Strands evaluation quickstart](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/quickstart/index.md) (1 shared tag)
+- [Strands Shell quickstart](/harness-sdk/pr-cms-48/docs/user-guide/shell/quickstart/index.md) (1 shared tag)
+- [TypeScript Quickstart](/harness-sdk/pr-cms-48/docs/user-guide/sdk/quickstart/typescript/index.md) (1 shared tag)
+- [Use Strands with AI coding agents](/harness-sdk/pr-cms-48/docs/user-guide/build-with-ai/index.md) (1 shared tag)
+- [Red teaming quickstart](/harness-sdk/pr-cms-48/docs/user-guide/evals-sdk/red-teaming/quickstart/index.md) (1 shared tag)
+- [Build a Voice Agent](/harness-sdk/pr-cms-48/docs/user-guide/sdk/bidi/quickstart/index.md) (1 shared tag)
+- [Decision models quickstart](/harness-sdk/pr-cms-48/docs/user-guide/sdk/decision-models/quickstart/index.md) (1 shared tag)

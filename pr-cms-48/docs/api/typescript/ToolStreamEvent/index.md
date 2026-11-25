@@ -1,0 +1,73 @@
+Defined in: [src/tools/tool.ts:77](https://github.com/strands-agents/harness-sdk/blob/main/strands-ts/src/tools/tool.ts#L77)
+
+Event yielded during tool execution to report streaming progress. Tools can yield zero or more of these events before returning the final ToolResult.
+
+## Example
+
+```typescript
+const streamEvent = new ToolStreamEvent({
+  data: 'Processing step 1...'
+})
+
+// Or with structured data
+const streamEvent = new ToolStreamEvent({
+  data: { progress: 50, message: 'Halfway complete' }
+})
+```
+
+## Implements
+
+-   [`ToolStreamEventData`](/harness-sdk/pr-cms-48/docs/api/typescript/ToolStreamEventData/index.md)
+
+## Constructors
+
+### Constructor
+
+```ts
+new ToolStreamEvent(eventData): ToolStreamEvent;
+```
+
+Defined in: [src/tools/tool.ts:89](https://github.com/strands-agents/harness-sdk/blob/main/strands-ts/src/tools/tool.ts#L89)
+
+#### Parameters
+
+| Parameter | Type |
+| --- | --- |
+| `eventData` | { `data?`: `unknown`; } |
+| `eventData.data?` | `unknown` |
+
+#### Returns
+
+`ToolStreamEvent`
+
+## Properties
+
+### type
+
+```ts
+readonly type: "toolStreamEvent";
+```
+
+Defined in: [src/tools/tool.ts:81](https://github.com/strands-agents/harness-sdk/blob/main/strands-ts/src/tools/tool.ts#L81)
+
+Discriminator for tool stream events.
+
+#### Implementation of
+
+[`ToolStreamEventData`](/harness-sdk/pr-cms-48/docs/api/typescript/ToolStreamEventData/index.md).[`type`](/harness-sdk/pr-cms-48/docs/api/typescript/ToolStreamEventData/index.md#type)
+
+---
+
+### data?
+
+```ts
+readonly data?: unknown;
+```
+
+Defined in: [src/tools/tool.ts:87](https://github.com/strands-agents/harness-sdk/blob/main/strands-ts/src/tools/tool.ts#L87)
+
+Caller-provided data for the progress update. Can be any type of data the tool wants to report.
+
+#### Implementation of
+
+[`ToolStreamEventData`](/harness-sdk/pr-cms-48/docs/api/typescript/ToolStreamEventData/index.md).[`data`](/harness-sdk/pr-cms-48/docs/api/typescript/ToolStreamEventData/index.md#data)
