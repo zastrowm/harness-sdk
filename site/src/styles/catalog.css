@@ -577,8 +577,8 @@ body:has(.cat-page) {
   }
 }
 
-/* Filters in the URL: hide the unfiltered grid and count until the page script
-   applies them (see the inline script above the grid in integrations.astro). */
-html[data-cat-pending] :is(.cat-grid, [data-cat-count]) {
+/* Filters in the URL: the inline prefilter (integrations.astro) hides the cards
+   they exclude; the count waits for the page script to set it. */
+html[data-cat-pending] [data-cat-count] {
   visibility: hidden;
 }

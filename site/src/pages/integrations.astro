@@ -12,6 +12,7 @@ import CatalogFacets from '../components/catalog/CatalogFacets.astro'
 import { CATALOG_TYPES, MAINTAINED_BY_TIERS } from '../components/catalog/types'
 import { toCardModel, sortEntries, type CatalogStatsFile } from '../util/catalog'
 import { pathWithBase } from '../util/links'
+import { FILTER_KNOWN_VALUES, prefilterSelector } from '../util/catalog-filter'
 import { integrationsSchema } from '../util/structured-data'
 import { CATALOG_FEED_PATH } from '../util/catalog-feed'
 import statsFile from '../data/catalog-stats.json'
@@ -47,10 +48,32 @@ const maintainedByFacets = MAINTAINED_BY_TIERS.map(({ value, label }) => ({
   count: cards.filter((c) => c.maintainedBy === value).length,
 })).filter((t) => t.count > 0)
 
+// Inline, run before the grid: see prefilterSelector in util/catalog-filter.ts.
+const prefilterScript = `;(function () {
+  var result = (${prefilterSelector.toString()})(location.search, ${JSON.stringify(FILTER_KNOWN_VALUES)})
+  var style = document.createElement('style')
+  style.id = 'cat-prefilter'
+  style.textContent = result.hide + '{display:none}'
+  document.head.appendChild(style)
+  if (result.filtered) document.documentElement.dataset.catPending = ''
+})()`
+
 const title = 'Integrations'
 const description = 'Community-built tools, model providers, plugins, and integrations for Strands Agents.'
 const feedHead = [
   { tag: 'link' as const, attrs: { rel: 'alternate', type: 'application/json', href: pathWithBase(CATALOG_FEED_PATH) } },
+  // The fade (@view-transition below) is for leaving an integration page. Skip it
+  // for every other arrival, such as a sidebar type link, which loads this page
+  // again: there it only slows the switch and fades the old highlight out. Must
+  // be in <head> so it is listening before the first render.
+  {
+    tag: 'script' as const,
+    content: `addEventListener('pagereveal', function (e) {
+  if (!e.viewTransition) return
+  var from = window.navigation && navigation.activation && navigation.activation.from
+  if (!from || !from.url || new URL(from.url).pathname.indexOf('/docs/integrations/') < 0) e.viewTransition.skipTransition()
+})`,
+  },
 ]
 
 // Left sidebar (real Starlight sidebar): browse by type. Each link filters the
@@ -69,6 +92,10 @@ const sidebar = [
 
 <StarlightPage frontmatter={{ title, description, tableOfContents: false, head: feedHead }} sidebar={sidebar}>
   <div class="cat-page">
+    {/* With filters in the URL (a link, a reload, Back), hide the cards they
+        exclude before the grid streams in, so it never shows unfiltered, and hide
+        the count until the page script sets it. apply() removes both. */}
+    <script is:inline set:html={prefilterScript} />
     <div class="cat-head">
       <p class="cat-subtitle">Tools, model providers, and integrations built by the Strands team and community.</p>
       <div class="cat-head-actions">
@@ -103,21 +130,12 @@ const sidebar = [
         hasNew={hasNew}
       />
     </div>
-    {/* With filters in the URL (a Back or reload to a search), hide the grid and
-        count until the page script has filtered them, so the full grid doesn't
-        flash first. apply() clears the flag; the timeout covers a failed script. */}
     {/* Fade to and from integration pages, which opt in the same way (IntegrationModal.astro). */}
     <style is:inline>
       @view-transition {
         navigation: auto;
       }
     </style>
-    <script is:inline>
-      if (/[?&](q|type|lang|badge|by|sdk)=/.test(location.search)) {
-        document.documentElement.dataset.catPending = ''
-        setTimeout(() => delete document.documentElement.dataset.catPending, 3000)
-      }
-    </script>
     <div class="cat-grid" data-cat-grid>
       {cards.map((card) => <CatalogCard card={card} />)}
       {/* Not a .cat-card: the filter script must never hide this tile. */}
@@ -199,6 +217,9 @@ const sidebar = [
     }
     if (emptyEl) emptyEl.hidden = visible > 0
     if (countEl) countEl.textContent = String(visible)
+    // The [hidden] flags now match; drop the inline prefilter (it would keep the
+    // URL's first filters applied) and show the count.
+    document.getElementById('cat-prefilter')?.remove()
     delete document.documentElement.dataset.catPending
 
     // Reflect the active type onto the left sidebar (single-select browse).
@@ -213,6 +234,8 @@ const sidebar = [
       else a.removeAttribute('aria-current')
     })
     if (typeSelect) typeSelect.value = activeType
+    // aria-current is right now, so drop the first-paint highlight (Sidebar.astro).
+    delete document.documentElement.dataset.catType
 
     for (const btn of typeBtns) btn.setAttribute('aria-pressed', String(state.types.has(btn.dataset.catType || '')))
     for (const btn of badgeBtns) btn.setAttribute('aria-pressed', String(state.badges.has(btn.dataset.catBadge || '')))

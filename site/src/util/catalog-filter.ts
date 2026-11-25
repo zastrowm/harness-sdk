@@ -111,3 +111,55 @@ export function queryToState(query: string): CatalogFilterState {
     sdk: KNOWN_SDKS.has(sdkParam) ? sdkParam : DEFAULT_SDK,
   }
 }
+
+/** The values each URL facet accepts, as plain arrays for prefilterSelector. */
+export const FILTER_KNOWN_VALUES = {
+  type: [...KNOWN_TYPES],
+  lang: [...KNOWN_LANGUAGES],
+  badge: [...KNOWN_BADGES],
+  by: [...KNOWN_MAINTAINED_BY],
+  sdk: [...KNOWN_SDKS],
+}
+
+/**
+ * The same filtering as queryToState + matchesFilters, as a CSS selector for the
+ * cards a query hides. `filtered` is false when the query selects nothing beyond
+ * the default view, so the server-rendered count is already right.
+ *
+ * integrations.astro inlines this function's source in a script above the grid,
+ * so cards are filtered as the HTML streams in, before they are drawn, instead
+ * of showing unfiltered until the page script runs. So it must stay
+ * self-contained: no imports and no module-level values. The tests check that it
+ * agrees with matchesFilters.
+ */
+export function prefilterSelector(
+  query: string,
+  known: typeof FILTER_KNOWN_VALUES
+): { hide: string; filtered: boolean } {
+  const params = new URLSearchParams(query)
+  const pick = (key: 'type' | 'lang' | 'badge' | 'by') =>
+    (params.get(key) || '').split(',').filter((v) => known[key].includes(v))
+  // A CSS string: escape what would end it, with a hex escape for line breaks.
+  const str = (v: string) => '"' + v.replace(/["\\]/g, '\\$&').replace(/[\n\r\f]/g, ' ') + '"'
+  const any = (attr: string, op: string, values: string[]) =>
+    ':is(' + values.map((v) => '[' + attr + op + str(v) + ']').join(',') + ')'
+
+  const search = (params.get('q') || '').trim().toLowerCase()
+  const types = pick('type')
+  const languages = pick('lang')
+  const badges = pick('badge')
+  const maintainedBy = pick('by')
+  const sdkParam = params.get('sdk') || 'agents'
+  const sdk = known.sdk.includes(sdkParam) ? sdkParam : 'agents'
+  const filtered =
+    !!search || !!types.length || !!languages.length || !!badges.length || !!maintainedBy.length || sdk !== 'agents'
+
+  // Hidden when a card fails any facet; values within a facet OR together.
+  const fails = ['[data-sdk=' + str(sdk) + ']']
+  if (search) fails.push('[data-search*=' + str(search) + ']')
+  if (types.length) fails.push(any('data-type', '=', types))
+  if (languages.length) fails.push(any('data-langs', '~=', languages))
+  if (badges.length) fails.push(any('data-badges', '~=', badges))
+  if (maintainedBy.length) fails.push(any('data-maintained', '=', maintainedBy))
+  return { hide: fails.map((f) => '[data-cat-grid] .cat-card:not(' + f + ')').join(','), filtered }
+}
